@@ -439,10 +439,9 @@ extension LingoValue {
         set {
             switch self {
             case .listType(let arr):
-                arr.elements.append(newValue)
+                arr.elements[position] = newValue
             case .propertyListType(let props):
-                // Append without key for now if used via random append
-                props.elements.append((key: .void, value: newValue))
+                props.elements[position].value = newValue
             default:
                 break
             }
