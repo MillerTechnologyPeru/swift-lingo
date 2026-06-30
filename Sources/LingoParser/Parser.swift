@@ -5,6 +5,7 @@ public class Parser {
     private let tokens: [Token]
     private var currentIndex: Int = 0
     public var skippedTokens: [Token] = []
+    public var log: ((String) -> Void)?
     
     public init(tokens: [Token]) {
         self.tokens = tokens
@@ -64,6 +65,7 @@ public class Parser {
     }
     
     public func parseScript() -> Script {
+        log?("Starting parseScript")
         var statements: [Statement] = []
         
         skipNewlines()
@@ -74,10 +76,12 @@ public class Parser {
             skipNewlines()
         }
         
+        log?("Finished parseScript. Statements count: \(statements.count)")
         return Script(statements: statements)
     }
     
     private func parseTopLevel() -> Statement? {
+        log?("parseTopLevel at index \(currentIndex) (\(peek()))")
         if matchKeyword("on") {
             return parseHandler()
         } else if matchKeyword("property") {
@@ -99,6 +103,7 @@ public class Parser {
         } else {
             if matchKeyword("end") { return nil } // Ignore stray ends
             // Might be a top-level statement or error
+            log?("parseTopLevel falling back to parseStatement")
             return parseStatement()
         }
     }
@@ -139,6 +144,7 @@ public class Parser {
     }
     
     private func parseStatement() -> Statement? {
+        log?("parseStatement at index \(currentIndex) (\(peek()))")
         if matchKeyword("if") {
             return parseIf()
         } else if matchKeyword("repeat") {
@@ -243,6 +249,7 @@ public class Parser {
     }
     
     private func parseIf() -> Statement? {
+        log?("parseIf at index \(currentIndex)")
         guard let condition = parseExpression() else { return nil }
         _ = matchKeyword("then") // optional 'then'
         
@@ -343,41 +350,54 @@ public class Parser {
     }
     
     private func parseCase() -> Statement? {
-         guard let condition = parseExpression() else { return nil }
-         _ = matchKeyword("of")
-         
-         var cases: [CaseBlock] = []
-         var otherwise: [Statement]? = nil
-         
-         while !isAtEnd {
-             skipNewlines()
-             if matchKeyword("end") {
-                 _ = matchKeyword("case")
-                 break
-             } else if matchKeyword("otherwise") {
-                 _ = match(.colon)
-                 otherwise = []
-                 while !isAtEnd {
-                     skipNewlines()
-                     if matchKeyword("end") {
-                         _ = matchKeyword("case")
-                         break
-                     }
-                     if let stmt = parseStatement() {
-                         otherwise?.append(stmt)
-                     }
-                 }
-                 break
-             } else {
-                 // case value:
-                // case value:
-                var values: [Expression] = []
-                if let first = parseExpression() {
-                    values.append(first)
-                    while match(.comma) {
-                        if let next = parseExpression() { values.append(next) }
+        log?("parseCase at index \(currentIndex)")
+        guard let condition = parseExpression() else { return nil }
+        _ = matchKeyword("of")
+        
+        var cases: [CaseBlock] = []
+        var otherwise: [Statement]? = nil
+        
+        while !isAtEnd {
+            skipNewlines()
+            if matchKeyword("end") {
+                _ = matchKeyword("case")
+                log?("parseCase matched end case, breaking")
+                break
+            } else if matchKeyword("otherwise") {
+                _ = match(.colon)
+                otherwise = []
+                while !isAtEnd {
+                    skipNewlines()
+                    if matchKeyword("end") {
+                        _ = matchKeyword("case")
+                        log?("parseCase otherwise matched end case, breaking")
+                        break
                     }
-                } else { break }
+                    if let stmt = parseStatement() {
+                        otherwise?.append(stmt)
+                    }
+                }
+                break
+            } else {
+                var values: [Expression] = []
+                while !isAtEnd {
+                    log?("parseCase values loop at index \(currentIndex) (\(peek()))")
+                    if let expr = parseExpression() {
+                        values.append(expr)
+                        if match(.comma) { continue }
+                    } else { break }
+                    
+                    if matchKeyword("to") {
+                        if let expr2 = parseExpression() {
+                            // range not fully supported in AST values yet
+                        }
+                    } else { break }
+                }
+                
+                if values.isEmpty {
+                    log?("parseCase values empty, breaking")
+                    break 
+                }
                 _ = match(.colon)
                 
                 var body: [Statement] = []
@@ -400,11 +420,15 @@ public class Parser {
                         if case .identifier(let id) = t, id.lowercased() == "end" { break }
                         tempIdx += 1
                     }
-                    if isNewCase { break }
+                    if isNewCase { 
+                        log?("parseCase inner loop break because isNewCase=true at index \(currentIndex) (\(peek()))")
+                        break 
+                    }
                     
                     if let stmt = parseStatement() {
                         body.append(stmt)
                     } else {
+                        log?("parseCase inner loop break because parseStatement returned nil at index \(currentIndex) (\(peek()))")
                         break
                     }
                 }
