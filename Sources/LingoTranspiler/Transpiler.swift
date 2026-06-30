@@ -230,8 +230,12 @@ public class LingoTranspiler {
             for c in cases {
                 let caseVals = c.values.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
                 output += "\(indent)case \(caseVals):\n"
-                for stmt in c.body {
-                    output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                if c.body.isEmpty {
+                    output += "\(indent)    break\n"
+                } else {
+                    for stmt in c.body {
+                        output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                    }
                 }
             }
             output += "\(indent)default:\n"
@@ -297,17 +301,17 @@ public class LingoTranspiler {
         case .binaryOperation(let left, let op, let right):
             let l = transpile(expression: left, locals: locals, isMethod: isMethod)
             let r = transpile(expression: right, locals: locals, isMethod: isMethod)
-            let swiftOp: String
             switch op {
-            case .equals: swiftOp = "=="
-            case .notEquals: swiftOp = "!="
+            case .equals: return "(\(l) == \(r))"
+            case .notEquals: return "(\(l) != \(r))"
             case .logicalAnd: return "((\(l)).asBool() && (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
             case .logicalOr: return "((\(l)).asBool() || (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
-            case .stringConcat, .stringConcatSpace: swiftOp = "+"
-            case .modulo: return "LingoValue.integer(0)" // TODO modulo operator on LingoValue
-            default: swiftOp = op.rawValue
+            case .stringConcat, .stringConcatSpace: return "(\(l) + \(r))"
+            case .modulo: return "(\(l) % \(r))"
+            case .contains: return "\(l).contains(\(r))"
+            case .starts: return "\(l).starts(with: \(r))"
+            default: return "(\(l) \(op.rawValue) \(r))"
             }
-            return "(\(l) \(swiftOp) \(r))"
         case .unaryOperation(let op, let operand):
             let opr = transpile(expression: operand, locals: locals, isMethod: isMethod)
             if op == .not {
@@ -317,6 +321,18 @@ public class LingoTranspiler {
         case .list(let items):
             let itemsStr = items.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
             return ".list([\(itemsStr)])"
+        case .propertyList(let entries):
+            let entriesStr = entries.map { "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod)))" }.joined(separator: ", ")
+            return ".propertyList([\(entriesStr)])"
+        case .elementAccess(let target, let index):
+            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
+            let iStr = transpile(expression: index, locals: locals, isMethod: isMethod)
+            return "\(tStr)[\(iStr)]"
+        case .elementRangeAccess(let target, let start, let end):
+            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
+            let sStr = transpile(expression: start, locals: locals, isMethod: isMethod)
+            let eStr = transpile(expression: end, locals: locals, isMethod: isMethod)
+            return "\(tStr).getRange(start: \(sStr), end: \(eStr))"
         case .member(_, let id, _):
             let idStr = transpile(expression: id, locals: locals, isMethod: isMethod)
             return isMethod ? "self.`member`(\(idStr))" : "LingoEnvironment.shared.callGlobal(\"member\", args: [\(idStr)])"
@@ -324,7 +340,7 @@ public class LingoTranspiler {
             let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod)
             return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
         default:
-            return ".void // Unsupported expression: \(expression)"
+            return ".void /* Unsupported expression: \(expression) */"
         }
     }
     
