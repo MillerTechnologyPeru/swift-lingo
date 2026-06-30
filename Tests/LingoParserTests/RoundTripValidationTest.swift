@@ -17,17 +17,14 @@ final class RoundTripValidationTest: XCTestCase {
         return files.sorted()
     }
     
-    func isNewlineToken(_ token: Token) -> Bool {
-        if case .newline = token { return true }
-        return false
-    }
-    
-    func testAllJunkbotFilesParse() throws {
+    func testAllJunkbotFilesRoundTrip() throws {
         let files = findAllLingoFiles()
         XCTAssertFalse(files.isEmpty, "Should find .ls files in \(junkbotSourceDir)")
         
-        var failures: [String] = []
-        var parseSkipped: [String] = []
+        var parseFailures: [String] = []
+        var reparseFailures: [String] = []
+        var astMismatches: [String] = []
+        var trailingNewlineSkips: [String] = []
         
         for file in files {
             let fullPath = "\(junkbotSourceDir)/\(file)"
@@ -35,7 +32,7 @@ final class RoundTripValidationTest: XCTestCase {
             do {
                 source = try String(contentsOfFile: fullPath, encoding: .utf8)
             } catch {
-                failures.append("\(file): unreadable - \(error)")
+                parseFailures.append("\(file): unreadable - \(error)")
                 continue
             }
             
@@ -44,13 +41,11 @@ final class RoundTripValidationTest: XCTestCase {
             let parser = Parser(tokens: tokens)
             let script = parser.parseScript()
             
-            if !parser.skippedTokens.isEmpty {
-                let nonNewlineSkips = parser.skippedTokens.filter { !isNewlineToken($0) }
-                if !nonNewlineSkips.isEmpty {
-                    failures.append("\(file): skipped \(nonNewlineSkips.count) non-newline tokens: \(nonNewlineSkips)")
-                } else {
-                    parseSkipped.append("\(file): \(parser.skippedTokens.count) trailing newlines skipped")
-                }
+            // Only track trailing newlines as non-fatal
+            if !parser.skippedTokens.isEmpty && parser.skippedTokens.allSatisfy({ $0 == .newline }) {
+                trailingNewlineSkips.append("\(file): \(parser.skippedTokens.count) trailing newline(s)")
+            } else if !parser.skippedTokens.isEmpty {
+                parseFailures.append("\(file): initial parse skipped \(parser.skippedTokens.count) tokens")
             }
             
             let stringified = script.toLingoSource()
@@ -58,21 +53,38 @@ final class RoundTripValidationTest: XCTestCase {
             var lexer2 = Lexer(input: stringified)
             let tokens2 = lexer2.tokenize()
             let parser2 = Parser(tokens: tokens2)
-            let _ = parser2.parseScript()
+            let script2 = parser2.parseScript()
             
-            if !parser2.skippedTokens.isEmpty {
-                let nonNewlineSkips = parser2.skippedTokens.filter { !isNewlineToken($0) }
-                if !nonNewlineSkips.isEmpty {
-                    failures.append("\(file): re-parse skipped \(nonNewlineSkips.count) non-newline tokens: \(nonNewlineSkips)")
-                }
+            // Check for skipped tokens on re-parse
+            if !parser2.skippedTokens.isEmpty && parser2.skippedTokens.allSatisfy({ $0 == .newline }) {
+                // Trailing newlines are acceptable
+            } else if !parser2.skippedTokens.isEmpty {
+                reparseFailures.append("\(file): re-parse skipped \(parser2.skippedTokens.count) tokens")
+            }
+            
+            // Compare ASTs
+            if script != script2 {
+                astMismatches.append(file)
             }
         }
         
-        print("Files with only trailing newline skips (\(parseSkipped.count)):")
-        for f in parseSkipped { print("  \(f)") }
+        // Report non-fatal findings
+        if !trailingNewlineSkips.isEmpty {
+            print("Files with trailing newline skips (\(trailingNewlineSkips.count)):")
+            for f in trailingNewlineSkips { print("  \(f)") }
+        }
         
-        if !failures.isEmpty {
-            XCTFail("Failures in \(failures.count) files:\n" + failures.joined(separator: "\n"))
+        // Report actual failures
+        if !parseFailures.isEmpty {
+            XCTFail("Initial parse failures in \(parseFailures.count) files:\n" + parseFailures.joined(separator: "\n"))
+        }
+        
+        if !reparseFailures.isEmpty {
+            XCTFail("Re-parse failures in \(reparseFailures.count) files:\n" + reparseFailures.joined(separator: "\n"))
+        }
+        
+        if !astMismatches.isEmpty {
+            XCTFail("AST mismatches in \(astMismatches.count) files:\n" + astMismatches.joined(separator: "\n"))
         }
     }
 }
