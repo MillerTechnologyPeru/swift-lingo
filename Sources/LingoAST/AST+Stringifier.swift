@@ -164,6 +164,8 @@ extension Expression {
         case .list(let items):
             return "[" + items.map { $0.toLingoSource() }.joined(separator: ", ") + "]"
         case .propertyList(let entries):
+            // An empty property list is `[:]`; `[]` would re-parse as a linear list.
+            if entries.isEmpty { return "[:]" }
             return "[" + entries.map { "\($0.key.toLingoSource()): \($0.value.toLingoSource())" }.joined(separator: ", ") + "]"
         case .argList(let args):
             return "(" + args.map { $0.toLingoSource() }.joined(separator: ", ") + ")"
@@ -176,12 +178,16 @@ extension Expression {
         case .objCall(let name, let args): return ".\(name) \(args.toLingoSource())"
         case .objCallV4(let obj, let args): return "\(obj.toLingoSource())(\(args.toLingoSource()))"
         case .binaryOperation(let left, let op, let right):
-            return "\(left.toLingoSource()) \(op.rawValue) \(right.toLingoSource())"
+            // Parenthesize so the original grouping survives a re-parse,
+            // independent of operator-precedence rules.
+            return "(\(left.toLingoSource()) \(op.rawValue) \(right.toLingoSource()))"
         case .unaryOperation(let op, let operand):
+            // Parenthesize the operand so the operator binds to the whole
+            // sub-expression on re-parse (e.g. `not (x.count())`, `-(a + b)`).
             if op == .not {
-                return "not \(operand.toLingoSource())"
+                return "not (\(operand.toLingoSource()))"
             }
-            return "\(op.rawValue)\(operand.toLingoSource())"
+            return "\(op.rawValue)(\(operand.toLingoSource()))"
         case .chunkExpression(let type, let first, let last, let string):
             let lastStr = last != nil ? " to \(last!.toLingoSource())" : ""
             return "\(type) \(first.toLingoSource())\(lastStr) of \(string.toLingoSource())"
