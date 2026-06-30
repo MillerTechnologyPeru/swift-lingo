@@ -36,14 +36,16 @@ extension Statement {
             return pad + "put \(value.toLingoSource())\(targetStr)"
         case .ifStatement(let cond, let body, let elseBody):
             let header = pad + "if \(cond.toLingoSource()) then"
-            if body.isEmpty && (elseBody == nil || elseBody!.isEmpty) {
+            if body.isEmpty && elseBody == nil {
                 return header + "\n" + pad + "end if"
             }
             var result = header + "\n"
             for stmt in body {
                 result += stmt.toLingoSource(indent: indent + 1) + "\n"
             }
-            if let elseBody = elseBody, !elseBody.isEmpty {
+            // Emit `else` whenever the branch is present, even when empty,
+            // so the AST (which distinguishes `nil` from `[]`) round-trips.
+            if let elseBody = elseBody {
                 result += pad + "else\n"
                 for stmt in elseBody {
                     result += stmt.toLingoSource(indent: indent + 1) + "\n"
