@@ -151,7 +151,8 @@ public class LingoTranspiler {
         locals.subtract(globals)
         locals.subtract(properties)
         
-        let hoisted = locals.filter { !args.map{$0.lowercased()}.contains($0) }
+        let argumentNames = Set(args.map { $0.lowercased() })
+        let hoisted = locals.filter { !argumentNames.contains($0) }.sorted()
         for variable in hoisted {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
         }
