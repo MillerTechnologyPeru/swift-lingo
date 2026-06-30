@@ -1,71 +1,6 @@
 // LingoValue.swift
 // LingoRuntime module - Embedded Swift compatible
 
-/// Custom case-insensitive string operations to avoid Foundation dependency and Embedded Swift Unicode Data Tables
-fileprivate func _asciiLowercased(_ byte: UInt8) -> UInt8 {
-    if byte >= 65 && byte <= 90 { // 'A' ... 'Z'
-        return byte + 32
-    }
-    return byte
-}
-
-fileprivate func _caseInsensitiveEquals(_ l: String, _ r: String) -> Bool {
-    let lUTF8 = l.utf8
-    let rUTF8 = r.utf8
-    if lUTF8.count != rUTF8.count { return false }
-    var lIter = lUTF8.makeIterator()
-    var rIter = rUTF8.makeIterator()
-    while let lByte = lIter.next(), let rByte = rIter.next() {
-        if _asciiLowercased(lByte) != _asciiLowercased(rByte) {
-            return false
-        }
-    }
-    return true
-}
-
-fileprivate func _caseInsensitiveLessThan(_ l: String, _ r: String) -> Bool {
-    var lIter = l.utf8.makeIterator()
-    var rIter = r.utf8.makeIterator()
-    while let lByte = lIter.next() {
-        guard let rByte = rIter.next() else { return false } // r is shorter
-        let lLower = _asciiLowercased(lByte)
-        let rLower = _asciiLowercased(rByte)
-        if lLower != rLower {
-            return lLower < rLower
-        }
-    }
-    // l is shorter or equal
-    return rIter.next() != nil
-}
-
-fileprivate func _caseInsensitiveContains(_ s: String, _ substr: String) -> Bool {
-    let sBytes = Array(s.utf8)
-    let subBytes = Array(substr.utf8)
-    if subBytes.isEmpty { return true }
-    if subBytes.count > sBytes.count { return false }
-    for i in 0...(sBytes.count - subBytes.count) {
-        var match = true
-        for j in 0..<subBytes.count {
-            if _asciiLowercased(sBytes[i+j]) != _asciiLowercased(subBytes[j]) {
-                match = false
-                break
-            }
-        }
-        if match { return true }
-    }
-    return false
-}
-
-fileprivate func _caseInsensitiveStartsWith(_ s: String, _ prefix: String) -> Bool {
-    let sBytes = Array(s.utf8)
-    let pBytes = Array(prefix.utf8)
-    if pBytes.count > sBytes.count { return false }
-    for i in 0..<pBytes.count {
-        if _asciiLowercased(sBytes[i]) != _asciiLowercased(pBytes[i]) { return false }
-    }
-    return true
-}
-
 /// Represents a value in the Lingo runtime.
 @dynamicMemberLookup
 @dynamicCallable
@@ -221,7 +156,7 @@ public enum LingoValue {
         switch self {
         case .integer(let v): return v != 0
         case .float(let v): return v != 0
-        case .string(let v): return _caseInsensitiveEquals(v, "true")
+        case .string(let v): return v.caseInsensitiveEquals("true")
         case .void: return false
         default: return true
         }
@@ -237,10 +172,10 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return l == r
         case (.integer(let l), .float(let r)): return Double(l) == r
         case (.float(let l), .integer(let r)): return l == Double(r)
-        case (.string(let l), .string(let r)): return _caseInsensitiveEquals(l, r)
-        case (.symbol(let l), .symbol(let r)): return _caseInsensitiveEquals(l, r)
-        case (.symbol(let l), .string(let r)): return _caseInsensitiveEquals(l, r)
-        case (.string(let l), .symbol(let r)): return _caseInsensitiveEquals(l, r)
+        case (.string(let l), .string(let r)): return l.caseInsensitiveEquals(r)
+        case (.symbol(let l), .symbol(let r)): return l.caseInsensitiveEquals(r)
+        case (.symbol(let l), .string(let r)): return l.caseInsensitiveEquals(r)
+        case (.string(let l), .symbol(let r)): return l.caseInsensitiveEquals(r)
         case (.object(let l), .object(let r)): return l === r
         case (.list(let l), .list(let r)):
             if l.count != r.count { return false }
@@ -264,7 +199,7 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return l < r
         case (.integer(let l), .float(let r)): return Double(l) < r
         case (.float(let l), .integer(let r)): return l < Double(r)
-        case (.string(let l), .string(let r)): return _caseInsensitiveLessThan(l, r)
+        case (.string(let l), .string(let r)): return l.caseInsensitiveLessThan(r)
         default: return false // fallback
         }
     }
@@ -344,7 +279,7 @@ public enum LingoValue {
     public func contains(_ other: LingoValue) -> LingoValue {
         switch (self, other) {
         case (.string(let s), .string(let substr)):
-            return _caseInsensitiveContains(s, substr) ? .integer(1) : .integer(0)
+            return s.caseInsensitiveContains(substr) ? .integer(1) : .integer(0)
         case (.list(let arr), _):
             for item in arr {
                 if LingoValue.equalsBool(lhs: item, rhs: other) {
@@ -360,7 +295,7 @@ public enum LingoValue {
     /// Checks if a string starts with the given prefix.
     public func starts(with other: LingoValue) -> LingoValue {
         if case .string(let s) = self, case .string(let prefix) = other {
-            return _caseInsensitiveStartsWith(s, prefix) ? .integer(1) : .integer(0)
+            return s.caseInsensitiveStartsWith(prefix) ? .integer(1) : .integer(0)
         }
         return .integer(0)
     }
@@ -403,35 +338,5 @@ extension LingoValue: RandomAccessCollection {
                 break
             }
         }
-    }
-}
-
-/// Base class for Lingo objects, representing instances of Lingo classes.
-@dynamicMemberLookup
-@dynamicCallable
-open class LingoObject {
-    public init() {}
-    
-    open func getProperty(_ name: String) -> LingoValue { return .void }
-    open func setProperty(_ name: String, value: LingoValue) {}
-    open func callMethod(_ name: String, args: [LingoValue]) -> LingoValue { return .void }
-    
-    public subscript(dynamicMember member: String) -> LingoValue {
-        get {
-            let prop = getProperty(member)
-            if case .void = prop {} else { return prop }
-            
-            let glob = LingoEnvironment.shared.getGlobal(member)
-            if case .void = glob {} else { return glob }
-            
-            return .boundMethod(self, member)
-        }
-        set {
-            setProperty(member, value: newValue)
-        }
-    }
-    
-    public func dynamicallyCall(withArguments args: [LingoValue]) -> LingoValue {
-        return .void
     }
 }
