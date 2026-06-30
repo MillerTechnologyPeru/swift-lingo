@@ -639,6 +639,10 @@ public class Parser {
                     var castId: Expression? = nil
                     if match(.comma) {
                         castId = parseExpression()
+                    } else if matchKeyword("of") {
+                        // member(id of castLib whichCast)
+                        _ = matchKeyword("castLib")
+                        castId = parseExpression()
                     }
                     _ = match(.rightParen)
                     baseExpr = .member(type: "member", id: memberId, castId: castId)
