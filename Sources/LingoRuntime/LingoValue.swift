@@ -15,7 +15,7 @@ public enum LingoValue {
     case object(LingoObject)
     case boundMethod(LingoObject, String)
     case globalFunction(String)
-    
+
     /// Accesses properties on Lingo objects dynamically.
     public subscript(dynamicMember member: String) -> LingoValue {
         get {
@@ -33,14 +33,14 @@ public enum LingoValue {
             }
         }
     }
-    
+
     /// Sets a property on the underlying Lingo object.
     public func setProperty(_ name: String, value: LingoValue) {
         if case .object(let obj) = self {
             obj.setProperty(name, value: value)
         }
     }
-    
+
     /// 1-based indexing for Lingo lists and property lists.
     public subscript(index: LingoValue) -> LingoValue {
         get {
@@ -79,7 +79,7 @@ public enum LingoValue {
             // Managed by setElement
         }
     }
-    
+
     /// Mutates an element at a given 1-based index or key.
     public mutating func setElement(index: LingoValue, value: LingoValue) {
         switch self {
@@ -111,34 +111,35 @@ public enum LingoValue {
             break
         }
     }
-    
+
     /// 1-based string chunking (e.g. `char 1 to 5`).
     public func getRange(start: LingoValue, end: LingoValue) -> LingoValue {
         guard case .string(let s) = self,
-              case .integer(let sIdx) = start,
-              case .integer(let eIdx) = end else { return .void }
-        
+            case .integer(let sIdx) = start,
+            case .integer(let eIdx) = end
+        else { return .void }
+
         let safeStart = Swift.max(1, sIdx)
         let safeEnd = Swift.min(s.count, eIdx)
         if safeStart > safeEnd || safeStart > s.count { return .string("") }
-        
+
         let startStrIdx = s.index(s.startIndex, offsetBy: safeStart - 1)
         let endStrIdx = s.index(s.startIndex, offsetBy: safeEnd)
         return .string(String(s[startStrIdx..<endStrIdx]))
     }
-    
+
     /// 0-based range extraction for Swift convenience.
     public func getRange(start: Int, end: Int) -> LingoValue {
         guard case .string(let s) = self else { return .void }
         let safeStart = Swift.max(0, start)
         let safeEnd = Swift.min(s.count, end)
         if safeStart > safeEnd || safeStart >= s.count { return .string("") }
-        
+
         let startStrIdx = s.index(s.startIndex, offsetBy: safeStart)
         let endStrIdx = s.index(s.startIndex, offsetBy: safeEnd)
         return .string(String(s[startStrIdx..<endStrIdx]))
     }
-    
+
     /// Calls a bound method or global function dynamically.
     public func dynamicallyCall(withArguments args: [LingoValue]) -> LingoValue {
         switch self {
@@ -150,7 +151,7 @@ public enum LingoValue {
             return .void
         }
     }
-    
+
     /// Evaluates the value as a boolean for conditionals.
     public func asBool() -> Bool {
         switch self {
@@ -161,9 +162,9 @@ public enum LingoValue {
         default: return true
         }
     }
-    
+
     // MARK: - Relational Operators (Bool returning)
-    
+
     /// Performs a deep equality comparison and returns a Bool.
     public static func equalsBool(lhs: LingoValue, rhs: LingoValue) -> Bool {
         switch (lhs, rhs) {
@@ -191,7 +192,7 @@ public enum LingoValue {
         default: return false
         }
     }
-    
+
     /// Performs a less-than comparison and returns a Bool.
     public static func lessThanBool(lhs: LingoValue, rhs: LingoValue) -> Bool {
         switch (lhs, rhs) {
@@ -200,39 +201,39 @@ public enum LingoValue {
         case (.integer(let l), .float(let r)): return Double(l) < r
         case (.float(let l), .integer(let r)): return l < Double(r)
         case (.string(let l), .string(let r)): return l.caseInsensitiveLessThan(r)
-        default: return false // fallback
+        default: return false  // fallback
         }
     }
-    
+
     // MARK: - Relational Operators (LingoValue returning)
-    
-    public static func ==(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func == (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         return equalsBool(lhs: lhs, rhs: rhs) ? .integer(1) : .integer(0)
     }
-    
-    public static func !=(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func != (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         return equalsBool(lhs: lhs, rhs: rhs) ? .integer(0) : .integer(1)
     }
-    
-    public static func <(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func < (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         return lessThanBool(lhs: lhs, rhs: rhs) ? .integer(1) : .integer(0)
     }
-    
-    public static func >(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func > (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         return (!lessThanBool(lhs: lhs, rhs: rhs) && !equalsBool(lhs: lhs, rhs: rhs)) ? .integer(1) : .integer(0)
     }
-    
-    public static func <=(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func <= (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         return (lessThanBool(lhs: lhs, rhs: rhs) || equalsBool(lhs: lhs, rhs: rhs)) ? .integer(1) : .integer(0)
     }
-    
-    public static func >=(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func >= (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         return !lessThanBool(lhs: lhs, rhs: rhs) ? .integer(1) : .integer(0)
     }
-    
+
     // MARK: - Arithmetic Operators
-    
-    public static func +(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func + (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return .integer(l + r)
         case (.float(let l), .float(let r)): return .float(l + r)
@@ -242,8 +243,8 @@ public enum LingoValue {
         default: return .void
         }
     }
-    
-    public static func -(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func - (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return .integer(l - r)
         case (.float(let l), .float(let r)): return .float(l - r)
@@ -252,8 +253,8 @@ public enum LingoValue {
         default: return .void
         }
     }
-    
-    public static func *(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func * (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return .integer(l * r)
         case (.float(let l), .float(let r)): return .float(l * r)
@@ -262,8 +263,8 @@ public enum LingoValue {
         default: return .void
         }
     }
-    
-    public static func /(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func / (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return r == 0 ? .void : .integer(l / r)
         case (.float(let l), .float(let r)): return .float(l / r)
@@ -272,22 +273,22 @@ public enum LingoValue {
         default: return .void
         }
     }
-    
-    public static func %(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+
+    public static func % (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         guard case .integer(let l) = lhs, case .integer(let r) = rhs, r != 0 else { return .void }
         return .integer(l % r)
     }
-    
-    public static prefix func -(value: LingoValue) -> LingoValue {
+
+    public static prefix func - (value: LingoValue) -> LingoValue {
         switch value {
         case .integer(let v): return .integer(-v)
         case .float(let v): return .float(-v)
         default: return .void
         }
     }
-    
+
     // MARK: - Utilities
-    
+
     public func chunk(_ type: String, start: LingoValue, end: LingoValue?) -> LingoValue {
         guard case .string(let string) = self, let startIndex = start.asInteger() else { return .void }
         let endIndex = end?.asInteger() ?? startIndex
@@ -297,17 +298,17 @@ public enum LingoValue {
         if lowerBound > upperBound || lowerBound > chunks.count { return .string("") }
         return .string(chunks[(lowerBound - 1)..<upperBound].joined(separator: chunkJoiner(for: type)))
     }
-    
+
     public func lastChunk(_ type: String) -> LingoValue {
         guard case .string(let string) = self else { return .void }
         return .string(splitIntoChunks(string, type: type).last ?? "")
     }
-    
+
     public func chunkCount(_ type: String) -> LingoValue {
         guard case .string(let string) = self else { return .integer(0) }
         return .integer(splitIntoChunks(string, type: type).count)
     }
-    
+
     public func asInteger() -> Int? {
         switch self {
         case .integer(let v): return v
@@ -339,7 +340,7 @@ public enum LingoValue {
     public func concatSpace(_ other: LingoValue) -> LingoValue {
         return .string(self.asString() + " " + other.asString())
     }
-    
+
     private func splitIntoChunks(_ string: String, type: String) -> [String] {
         switch type.asciiLowercased() {
         case "char": return string.map { String($0) }
@@ -358,7 +359,7 @@ public enum LingoValue {
         default: return ""
         }
     }
-    
+
     /// Checks if a string or list contains the given value.
     public func contains(_ other: LingoValue) -> LingoValue {
         switch (self, other) {
@@ -375,7 +376,7 @@ public enum LingoValue {
             return .integer(0)
         }
     }
-    
+
     /// Checks if a string starts with the given prefix.
     public func starts(with other: LingoValue) -> LingoValue {
         if case .string(let s) = self, case .string(let prefix) = other {
@@ -394,9 +395,9 @@ public func ~= (pattern: LingoValue, value: LingoValue) -> Bool {
 extension LingoValue: RandomAccessCollection {
     public typealias Index = Int
     public typealias Element = LingoValue
-    
+
     public var startIndex: Int { 0 }
-    
+
     public var endIndex: Int {
         switch self {
         case .list(let arr): return arr.count
@@ -404,7 +405,7 @@ extension LingoValue: RandomAccessCollection {
         default: return 0
         }
     }
-    
+
     /// 0-based conventional Swift subscript. Not used by transpiler.
     public subscript(position: Int) -> LingoValue {
         get {

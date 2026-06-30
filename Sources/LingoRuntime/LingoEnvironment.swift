@@ -3,12 +3,12 @@
 
 public class LingoEnvironment {
     nonisolated(unsafe) public static let shared = LingoEnvironment()
-    
+
     private var globals: [(key: String, value: LingoValue)] = []
     private var globalFunctions: [(key: String, value: ([LingoValue]) -> LingoValue)] = []
-    
+
     public init() {}
-    
+
     public func getGlobal(_ name: String) -> LingoValue {
         let lower = name.asciiLowercased()
         for i in 0..<globals.count {
@@ -18,7 +18,7 @@ public class LingoEnvironment {
         }
         return .void
     }
-    
+
     public func setGlobal(_ name: String, _ value: LingoValue) {
         let lower = name.asciiLowercased()
         for i in 0..<globals.count {
@@ -29,12 +29,12 @@ public class LingoEnvironment {
         }
         globals.append((key: lower, value: value))
     }
-    
+
     public func registerGlobalFunction(_ name: String, _ function: @escaping ([LingoValue]) -> LingoValue) {
         let lower = name.asciiLowercased()
         globalFunctions.append((key: lower, value: function))
     }
-    
+
     public func callGlobal(_ name: String, args: [LingoValue]) -> LingoValue {
         let lower = name.asciiLowercased()
         for i in 0..<globalFunctions.count {
@@ -44,7 +44,7 @@ public class LingoEnvironment {
         }
         return .void
     }
-    
+
     public func clear() {
         globals = []
         globalFunctions = []

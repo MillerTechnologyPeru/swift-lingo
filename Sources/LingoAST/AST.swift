@@ -1,6 +1,6 @@
 public struct Script: Equatable {
     public var statements: [Statement]
-    
+
     public init(statements: [Statement]) {
         self.statements = statements
     }
@@ -34,7 +34,7 @@ public enum Statement: Equatable {
 public struct CaseBlock: Equatable {
     public var values: [Expression]
     public var body: [Statement]
-    
+
     public init(values: [Expression], body: [Statement]) {
         self.values = values
         self.body = body
@@ -46,35 +46,35 @@ public indirect enum Expression: Equatable {
     case integer(Int)
     case float(Double)
     case string(String)
-    case symbol(String) // e.g. #PREGAME
+    case symbol(String)  // e.g. #PREGAME
     case boolean(Bool)
-    
+
     case identifier(String)
     case the(String)
     case theProp(obj: Expression, prop: String)
     case objProp(obj: Expression, prop: String)
-    case propertyAccess(target: Expression, property: String) // object.property or the property of object
-    case elementAccess(target: Expression, index: Expression) // array[index]
+    case propertyAccess(target: Expression, property: String)  // object.property or the property of object
+    case elementAccess(target: Expression, index: Expression)  // array[index]
     case objPropIndex(obj: Expression, prop: String, index: Expression, index2: Expression?)
-    
-    case list([Expression]) // [1, 2, 3]
-    case propertyList([PropertyListEntry]) // [#key: value]
+
+    case list([Expression])  // [1, 2, 3]
+    case propertyList([PropertyListEntry])  // [#key: value]
     case argList([Expression])
     case argListNoRet([Expression])
-    
-    case functionCall(target: Expression?, name: String, arguments: [Expression]) // obj.method(args) or function(args)
+
+    case functionCall(target: Expression?, name: String, arguments: [Expression])  // obj.method(args) or function(args)
     case call(name: String, args: Expression)
     case objCall(name: String, args: Expression)
     case objCallV4(obj: Expression, args: Expression)
-    
+
     case binaryOperation(left: Expression, operator: BinaryOperator, right: Expression)
     case unaryOperation(operator: UnaryOperator, operand: Expression)
-    
-    case chunkExpression(type: ChunkType, first: Expression, last: Expression?, string: Expression) // e.g. word 1 of Entry
+
+    case chunkExpression(type: ChunkType, first: Expression, last: Expression?, string: Expression)  // e.g. word 1 of Entry
     case elementRangeAccess(target: Expression, start: Expression, end: Expression)
     case lastStringChunk(type: ChunkType, obj: Expression)
     case stringChunkCount(type: ChunkType, obj: Expression)
-    
+
     case spriteIntersects(first: Expression, second: Expression)
     case spriteWithin(first: Expression, second: Expression)
     case member(type: String, id: Expression, castId: Expression?)
@@ -88,7 +88,7 @@ public indirect enum Expression: Equatable {
 public struct PropertyListEntry: Equatable {
     public var key: Expression
     public var value: Expression
-    
+
     public init(key: Expression, value: Expression) {
         self.key = key
         self.value = value

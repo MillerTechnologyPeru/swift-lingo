@@ -17,10 +17,12 @@ enum JunkbotFixtures {
     /// All bundled `.ls` files, sorted by their path relative to `filesDirectory`.
     static func allLingoFiles() -> [URL] {
         let root = filesDirectory
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: nil
-        ) else {
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: nil
+            )
+        else {
             return []
         }
 
