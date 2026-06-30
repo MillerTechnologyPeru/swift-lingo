@@ -94,14 +94,14 @@ public struct PropertyListEntry: Equatable {
     }
 }
 
-public enum ChunkType: Equatable {
+public enum ChunkType: String, CaseIterable, Sendable {
     case char
     case word
     case item
     case line
 }
 
-public enum BinaryOperator: String, Equatable {
+public enum BinaryOperator: String, CaseIterable, Sendable {
     case add = "+"
     case subtract = "-"
     case multiply = "*"
@@ -121,12 +121,12 @@ public enum BinaryOperator: String, Equatable {
     case starts = "starts"
 }
 
-public enum UnaryOperator: String, Equatable {
+public enum UnaryOperator: String, CaseIterable, Sendable {
     case negate = "-"
     case not = "not"
 }
 
-public enum PutType: Equatable {
+public enum PutType: String, CaseIterable, Sendable {
     case into
     case after
     case before
