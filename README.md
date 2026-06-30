@@ -1,6 +1,6 @@
 # SwiftLingo
 
-A Swift package that transpiles [Adobe Director](https://en.wikipedia.org/wiki/Adobe_Director) [Lingo](https://en.wikipedia.org/wiki/Lingo_(programming_language) scripts (`.ls` files) to native Swift source code, along with a runtime library for executing the generated code.
+A Swift package that transpiles [Adobe Director](https://en.wikipedia.org/wiki/Adobe_Director) [Lingo(https://en.wikipedia.org/wiki/Lingo_(programming_language) scripts (`.ls` files) to native Swift source code, along with a runtime library for executing the generated code.
 
 ## Overview
 
