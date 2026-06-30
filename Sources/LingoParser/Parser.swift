@@ -566,7 +566,14 @@ public class Parser {
             }
             }
         } else if matchKeyword("sprite") {
-            if let spriteId = parsePrimary() {
+            var spriteId: Expression?
+            if match(.leftParen) {
+                spriteId = parseExpression()
+                _ = match(.rightParen)
+            } else {
+                spriteId = parsePrimary()
+            }
+            if let spriteId = spriteId {
                 if matchKeyword("intersects") {
                     if let target = parsePrimary() { baseExpr = .spriteIntersects(first: spriteId, second: target) }
                 } else if matchKeyword("within") {
