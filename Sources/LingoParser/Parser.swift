@@ -296,6 +296,23 @@ public class Parser {
     private func parseRepeat() -> Statement? {
         if matchKeyword("with") {
             guard case .identifier(let varName) = advance() else { return nil }
+            
+            if matchKeyword("in") {
+                // repeat with x in list
+                guard let listExpr = parseExpression() else { return nil }
+                var body: [Statement] = []
+                while !isAtEnd {
+                    skipNewlines()
+                    if matchKeyword("end") {
+                        _ = matchKeyword("repeat")
+                        break
+                    }
+                    if let stmt = parseStatement() {
+                        body.append(stmt)
+                    }
+                }
+                return .repeatWithIn(variable: varName, list: listExpr, body: body)
+            } else {
             _ = match(.equals)
             guard let startExpr = parseExpression() else { return nil }
             
@@ -315,21 +332,7 @@ public class Parser {
                     }
                 }
                 return .repeatWithCounter(variable: varName, start: startExpr, end: endExpr, body: body, up: true)
-            } else if matchKeyword("in") {
-                // repeat with x in list
-                guard let listExpr = parseExpression() else { return nil }
-                var body: [Statement] = []
-                while !isAtEnd {
-                    skipNewlines()
-                    if matchKeyword("end") {
-                        _ = matchKeyword("repeat")
-                        break
-                    }
-                    if let stmt = parseStatement() {
-                        body.append(stmt)
-                    }
                 }
-                return .repeatWithIn(variable: varName, list: listExpr, body: body)
             }
         } else if matchKeyword("while") {
             guard let condition = parseExpression() else { return nil }
