@@ -14,7 +14,7 @@ public class LingoTranspiler {
         var output = "// Transpiled from \(shortPath)\n"
         output += "import LingoRuntime\n\n"
         
-        let isMovie = relativePath.lowercased().contains("movie_")
+        let isMovie = relativePath.asciiLowercased().contains("movie_")
         
         if !isMovie {
             let className = formatClassName(relativePath)
@@ -32,7 +32,7 @@ public class LingoTranspiler {
                 output += "    /// Property keys for type-safe property access.\n"
                 output += "    public enum CodingKeys: String, Sendable, CaseIterable {\n"
                 for prop in properties {
-                    output += "        case `\(prop)` = \"\(prop.lowercased())\"\n"
+                    output += "        case `\(prop)` = \"\(prop.asciiLowercased())\"\n"
                 }
                 output += "\n"
                 output += "        /// Case-insensitive lookup without Unicode data tables.\n"
@@ -91,7 +91,7 @@ public class LingoTranspiler {
             }
             output += transpileCallMethod(handlers: handlers)
             
-            let propertyNames = Set(properties.map { $0.lowercased() })
+            let propertyNames = Set(properties.map { $0.asciiLowercased() })
             for stmt in script.statements {
                 if case .handler(let name, let arguments, let body) = stmt {
                     output += transpileHandler(name: name, args: arguments, body: body, isMethod: true, properties: propertyNames)
@@ -112,11 +112,11 @@ public class LingoTranspiler {
     
     private func transpileCallMethod(handlers: [(name: String, arguments: [String], body: [Statement])]) -> String {
         var output = "    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {\n"
-        output += "        switch name.lowercased() {\n"
-        for handler in handlers where handler.name.lowercased() != "new" {
-            let lingoArgs = handler.arguments.filter { $0.lowercased() != "me" }
+        output += "        switch name.asciiLowercased() {\n"
+        for handler in handlers where handler.name.asciiLowercased() != "new" {
+            let lingoArgs = handler.arguments.filter { $0.asciiLowercased() != "me" }
             let callArgs = lingoArgs.indices.map { "args.count > \($0) ? args[\($0)] : .void" }.joined(separator: ", ")
-            output += "        case \"\(handler.name.lowercased())\": return self.`\(handler.name)`(\(callArgs))\n"
+            output += "        case \"\(handler.name.asciiLowercased())\": return self.`\(handler.name)`(\(callArgs))\n"
         }
         output += "        default: return super.callMethod(name, args: args)\n"
         output += "        }\n"
@@ -127,12 +127,12 @@ public class LingoTranspiler {
     private func transpileHandler(name: String, args: [String], body: [Statement], isMethod: Bool, properties: Set<String>) -> String {
         let previousProperties = activeProperties
         let previousHandlerIsInitializer = activeHandlerIsInitializer
-        let isInitializer = isMethod && name.lowercased() == "new"
+        let isInitializer = isMethod && name.asciiLowercased() == "new"
         activeProperties = properties
         activeHandlerIsInitializer = isInitializer
         var output = ""
         let functionIndent = isMethod ? "    " : ""
-        let swiftArgs = args.filter { $0.lowercased() != "me" }.map { "_ `\($0)`: LingoValue" }.joined(separator: ", ")
+        let swiftArgs = args.filter { $0.asciiLowercased() != "me" }.map { "_ `\($0)`: LingoValue" }.joined(separator: ", ")
         if isInitializer {
             let overrideKeyword = swiftArgs.isEmpty ? "override " : ""
             output += "\(functionIndent)public \(overrideKeyword)init(\(swiftArgs)) {\n"
@@ -147,11 +147,11 @@ public class LingoTranspiler {
         var locals = Set<String>()
         var globals = Set<String>()
         collectVariables(in: body, locals: &locals, globals: &globals)
-        for arg in args { locals.insert(arg.lowercased()) }
+        for arg in args { locals.insert(arg.asciiLowercased()) }
         locals.subtract(globals)
         locals.subtract(properties)
         
-        let hoisted = locals.filter { !args.map{$0.lowercased()}.contains($0) }
+        let hoisted = locals.filter { !args.map{$0.asciiLowercased()}.contains($0) }
         for variable in hoisted {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
         }
@@ -175,20 +175,20 @@ public class LingoTranspiler {
         for stmt in statements {
             switch stmt {
             case .global(let names):
-                for name in names { globals.insert(name.lowercased()) }
+                for name in names { globals.insert(name.asciiLowercased()) }
             case .assignment(let target, _):
                 if case .identifier(let name) = target {
-                    locals.insert(name.lowercased())
+                    locals.insert(name.asciiLowercased())
                 }
             case .put(_, _, let target):
                 if let target = target, case .identifier(let name) = target {
-                    locals.insert(name.lowercased())
+                    locals.insert(name.asciiLowercased())
                 }
             case .repeatWithCounter(let variable, _, _, let body, _):
-                locals.insert(variable.lowercased())
+                locals.insert(variable.asciiLowercased())
                 collectVariables(in: body, locals: &locals, globals: &globals)
             case .repeatWithIn(let variable, _, let body):
-                locals.insert(variable.lowercased())
+                locals.insert(variable.asciiLowercased())
                 collectVariables(in: body, locals: &locals, globals: &globals)
             case .ifStatement(_, let body, let elseBody):
                 collectVariables(in: body, locals: &locals, globals: &globals)
@@ -214,7 +214,7 @@ public class LingoTranspiler {
         case .assignment(let target, let value):
             let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
             if case .identifier(let name) = target {
-                let lower = name.lowercased()
+                let lower = name.asciiLowercased()
                 if locals.contains(lower) {
                     output += "\(indent)`\(lower)` = \(valStr)\n"
                 } else if isMethod && activeProperties.contains(lower) {
@@ -237,7 +237,7 @@ public class LingoTranspiler {
             let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
             if let t = target {
                 if case .identifier(let name) = t {
-                    let lower = name.lowercased()
+                    let lower = name.asciiLowercased()
                     if locals.contains(lower) {
                         output += "\(indent)`\(lower)` = \(valStr)\n"
                     } else if isMethod && activeProperties.contains(lower) {
@@ -266,14 +266,14 @@ public class LingoTranspiler {
         case .repeatWithCounter(let variable, let start, let end, let body, let up):
             let startStr = transpile(expression: start, locals: locals, isMethod: isMethod)
             let endStr = transpile(expression: end, locals: locals, isMethod: isMethod)
-            output += "\(indent)`\(variable.lowercased())` = \(startStr)\n"
+            output += "\(indent)`\(variable.asciiLowercased())` = \(startStr)\n"
             let op = up ? "<=" : ">="
             let inc = up ? "+" : "-"
-            output += "\(indent)while (`\(variable.lowercased())` \(op) \(endStr)).asBool() {\n"
+            output += "\(indent)while (`\(variable.asciiLowercased())` \(op) \(endStr)).asBool() {\n"
             for stmt in body {
                 output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
-            output += "\(indent)    `\(variable.lowercased())` = `\(variable.lowercased())` \(inc) .integer(1)\n"
+            output += "\(indent)    `\(variable.asciiLowercased())` = `\(variable.asciiLowercased())` \(inc) .integer(1)\n"
             output += "\(indent)}\n"
         case .repeatWhile(let cond, let body):
             let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
@@ -285,7 +285,7 @@ public class LingoTranspiler {
         case .repeatWithIn(let variable, let list, let body):
             let listStr = transpile(expression: list, locals: locals, isMethod: isMethod)
             output += "\(indent)for lingoItem in \(listStr) {\n"
-            output += "\(indent)    `\(variable.lowercased())` = lingoItem\n"
+            output += "\(indent)    `\(variable.asciiLowercased())` = lingoItem\n"
             for stmt in body {
                 output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
@@ -369,7 +369,7 @@ public class LingoTranspiler {
         case .symbol(let v): return ".symbol(\"\(escapeSwiftString(v))\")"
         case .boolean(let v): return ".integer(\(v ? 1 : 0))"
         case .identifier(let name):
-            let lower = name.lowercased()
+            let lower = name.asciiLowercased()
             if lower == "me" { return ".object(self)" }
             if lower == "void" { return ".void" }
             if locals.contains(lower) {
@@ -396,8 +396,8 @@ public class LingoTranspiler {
                 let tStr = transpile(expression: t, locals: locals, isMethod: isMethod)
                 return "\(tStr).`\(name)`(\(argStr))"
             } else {
-                if locals.contains(name.lowercased()) {
-                    return "`\(name.lowercased())`(\(argStr))" // LingoValue being called
+                if locals.contains(name.asciiLowercased()) {
+                    return "`\(name.asciiLowercased())`(\(argStr))" // LingoValue being called
                 } else {
                     return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
                 }
@@ -498,7 +498,7 @@ public class LingoTranspiler {
     private func formatClassName(_ relativePath: String) -> String {
         let name = relativePath.replacingOccurrences(of: ".ls", with: "")
         let components = name.split { !$0.isLetter && !$0.isNumber }
-        return components.map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }.joined()
+        return components.map { $0.prefix(1).uppercased() + String($0.dropFirst()).asciiLowercased() }.joined()
     }
     
     private func escapeSwiftString(_ value: String) -> String {
@@ -511,10 +511,24 @@ public class LingoTranspiler {
     }
 }
 
+private extension String {
+    func asciiLowercased() -> String {
+        var bytes: [UInt8] = []
+        for byte in self.utf8 {
+            if byte >= 65 && byte <= 90 {
+                bytes.append(byte + 32)
+            } else {
+                bytes.append(byte)
+            }
+        }
+        return String(decoding: bytes, as: UTF8.self)
+    }
+}
+
 private extension LingoAST.Expression {
     var isMeReference: Bool {
         if case .identifier(let name) = self {
-            return name.lowercased() == "me"
+            return name.asciiLowercased() == "me"
         }
         return false
     }
