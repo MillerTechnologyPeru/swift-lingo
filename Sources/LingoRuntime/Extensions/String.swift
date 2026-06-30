@@ -10,7 +10,7 @@ fileprivate func _asciiLowercased(_ byte: UInt8) -> UInt8 {
 }
 
 extension String {
-    internal func caseInsensitiveEquals(_ other: String) -> Bool {
+    public func caseInsensitiveEquals(_ other: String) -> Bool {
         let lUTF8 = self.utf8
         let rUTF8 = other.utf8
         if lUTF8.count != rUTF8.count { return false }
@@ -24,7 +24,7 @@ extension String {
         return true
     }
 
-    internal func caseInsensitiveLessThan(_ other: String) -> Bool {
+    public func caseInsensitiveLessThan(_ other: String) -> Bool {
         var lIter = self.utf8.makeIterator()
         var rIter = other.utf8.makeIterator()
         while let lByte = lIter.next() {
@@ -39,7 +39,7 @@ extension String {
         return rIter.next() != nil
     }
 
-    internal func caseInsensitiveContains(_ substr: String) -> Bool {
+    public func caseInsensitiveContains(_ substr: String) -> Bool {
         let sBytes = Array(self.utf8)
         let subBytes = Array(substr.utf8)
         if subBytes.isEmpty { return true }
@@ -57,7 +57,7 @@ extension String {
         return false
     }
 
-    internal func caseInsensitiveStartsWith(_ prefix: String) -> Bool {
+    public func caseInsensitiveStartsWith(_ prefix: String) -> Bool {
         let sBytes = Array(self.utf8)
         let pBytes = Array(prefix.utf8)
         if pBytes.count > sBytes.count { return false }
