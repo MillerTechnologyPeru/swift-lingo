@@ -138,7 +138,7 @@ public final class LingoTranspiler {
         output += "            return super.callMethod(name, args: args)\n"
         output += "        }\n"
         output += "        switch methodName {\n"
-        
+
         for handler in validHandlers {
             let lingoArgs = handler.arguments.filter { $0.lowercased() != "me" }
             let callArgs = lingoArgs.indices.map { "args.count > \($0) ? args[\($0)] : .void" }.joined(separator: ", ")
