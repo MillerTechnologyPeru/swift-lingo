@@ -9,6 +9,11 @@ jobs:
       fail-fast: false
       matrix:
         config: [debug, release]
+        target:
+          - sdk: swift-6.3.2-RELEASE_wasm
+            flags: ""
+          - sdk: swift-6.3.2-RELEASE_wasm-embedded
+            flags: "-Xswiftc -enable-experimental-feature -Xswiftc Embedded"
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -24,4 +29,9 @@ jobs:
         swift sdk install wasm.artifactbundle.tar.gz
         swift sdk list
     - name: Build
-      run: swift build --target LingoRuntime -c ${{ matrix.config }} --swift-sdk swift-6.3.2-RELEASE_wasm
+      run: >-
+        swift build
+        --target LingoRuntime
+        -c ${{ matrix.config }}
+        ${{ matrix.target.flags }}
+        --swift-sdk ${{ matrix.target.sdk }}
