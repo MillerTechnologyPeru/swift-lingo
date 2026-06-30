@@ -4,27 +4,48 @@ import PackageDescription
 let package = Package(
     name: "SwiftLingo",
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "SwiftLingo",
-            targets: ["SwiftLingo"]
-        )
+        .executable(name: "SwiftLingo", targets: ["SwiftLingo"]),
+        .library(name: "LingoAST", targets: ["LingoAST"]),
+        .library(name: "LingoLexer", targets: ["LingoLexer"]),
+        .library(name: "LingoParser", targets: ["LingoParser"]),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
+        // AST
         .target(
+            name: "LingoAST",
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        // Lexer
+        .target(
+            name: "LingoLexer",
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        .testTarget(
+            name: "LingoLexerTests",
+            dependencies: ["LingoLexer"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        // Parser
+        .target(
+            name: "LingoParser",
+            dependencies: ["LingoAST", "LingoLexer"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        .testTarget(
+            name: "LingoParserTests",
+            dependencies: ["LingoParser"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        // Main integration executable
+        .executableTarget(
             name: "SwiftLingo",
-            swiftSettings: [
-                .enableUpcomingFeature("ApproachableConcurrency")
-            ],
+            dependencies: ["LingoAST", "LingoLexer", "LingoParser"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         .testTarget(
             name: "SwiftLingoTests",
             dependencies: ["SwiftLingo"],
-            swiftSettings: [
-                .enableUpcomingFeature("ApproachableConcurrency")
-            ],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
     ]
 )
