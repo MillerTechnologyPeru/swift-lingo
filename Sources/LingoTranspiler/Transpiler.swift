@@ -119,14 +119,31 @@ public final class LingoTranspiler {
     }
 
     private func transpileCallMethod(handlers: [(name: String, arguments: [String], body: [Statement])]) -> String {
-        var output = "    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {\n"
-        output += "        switch name.asciiLowercased() {\n"
-        for handler in handlers where handler.name.lowercased() != "new" {
+        let validHandlers = handlers.filter { $0.name.lowercased() != "new" }
+        guard !validHandlers.isEmpty else {
+            var output = "    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {\n"
+            output += "        return super.callMethod(name, args: args)\n"
+            output += "    }\n\n"
+            return output
+        }
+
+        var output = "    private enum MethodName: String {\n"
+        for handler in validHandlers {
+            output += "        case `\(handler.name.lowercased())` = \"\(handler.name.lowercased())\"\n"
+        }
+        output += "    }\n\n"
+
+        output += "    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {\n"
+        output += "        guard let methodName = MethodName(rawValue: name.asciiLowercased()) else {\n"
+        output += "            return super.callMethod(name, args: args)\n"
+        output += "        }\n"
+        output += "        switch methodName {\n"
+
+        for handler in validHandlers {
             let lingoArgs = handler.arguments.filter { $0.lowercased() != "me" }
             let callArgs = lingoArgs.indices.map { "args.count > \($0) ? args[\($0)] : .void" }.joined(separator: ", ")
-            output += "        case \"\(handler.name.lowercased())\": return self.`\(handler.name)`(\(callArgs))\n"
+            output += "        case .`\(handler.name.lowercased())`: return self.`\(handler.name)`(\(callArgs))\n"
         }
-        output += "        default: return super.callMethod(name, args: args)\n"
         output += "        }\n"
         output += "    }\n\n"
         return output
@@ -140,7 +157,7 @@ public final class LingoTranspiler {
         activeHandlerIsInitializer = isInitializer
         var output = ""
         let functionIndent = isMethod ? "    " : ""
-        let swiftArgs = args.filter { $0.lowercased() != "me" }.map { "_ `\($0)`: LingoValue" }.joined(separator: ", ")
+        let swiftArgs = args.filter { $0.lowercased() != "me" }.map { "_ `\($0.lowercased())`: LingoValue = LingoValue.void" }.joined(separator: ", ")
         if isInitializer {
             let overrideKeyword = swiftArgs.isEmpty ? "override " : ""
             output += "\(functionIndent)public \(overrideKeyword)init(\(swiftArgs)) {\n"
@@ -164,7 +181,10 @@ public final class LingoTranspiler {
         for variable in hoisted {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
         }
-        if !hoisted.isEmpty { output += "\n" }
+        for arg in args where arg.lowercased() != "me" {
+            output += "\(indent)var `\(arg.lowercased())`: LingoValue = `\(arg.lowercased())`\n"
+        }
+        if !hoisted.isEmpty || args.count > (args.contains { $0.lowercased() == "me" } ? 1 : 0) { output += "\n" }
 
         for stmt in body {
             output += transpile(statement: stmt, indent: indent, locals: locals, isMethod: isMethod)
@@ -214,7 +234,8 @@ public final class LingoTranspiler {
     }
 
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
-        var output = "\(indent)// \(statement.toLingoSource())\n"
+        let commentedSource = statement.toLingoSource().split(separator: "\n", omittingEmptySubsequences: false).map { "\(indent)// \($0)" }.joined(separator: "\n")
+        var output = "\(commentedSource)\n"
         switch statement {
         case .global, .property:
             break
@@ -240,6 +261,8 @@ public final class LingoTranspiler {
                 let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
                 let idxStr = transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
                 output += "\(indent)\(objStr).setElement(index: \(idxStr), value: \(valStr))\n"
+            } else if case .the(let name) = target {
+                output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
             } else {
                 let targetStr = transpile(expression: target, locals: locals, isMethod: isMethod)
                 output += "\(indent)\(targetStr) = \(valStr)\n"
@@ -256,6 +279,8 @@ public final class LingoTranspiler {
                     } else {
                         output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
                     }
+                } else if case .the(let name) = t {
+                    output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
                 } else {
                     let targetStr = transpile(expression: t, locals: locals, isMethod: isMethod)
                     output += "\(indent)\(targetStr) = \(valStr)\n"
@@ -263,7 +288,7 @@ public final class LingoTranspiler {
             }
         case .ifStatement(let cond, let body, let elseBody):
             let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
-            output += "\(indent)if (\(condStr)).asBool() {\n"
+            output += "\(indent)if (\(condStr) as LingoValue).asBool() {\n"
             for stmt in body {
                 output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
@@ -280,7 +305,7 @@ public final class LingoTranspiler {
             output += "\(indent)`\(variable.lowercased())` = \(startStr)\n"
             let op = up ? "<=" : ">="
             let inc = up ? "+" : "-"
-            output += "\(indent)while (`\(variable.lowercased())` \(op) \(endStr)).asBool() {\n"
+            output += "\(indent)while ((`\(variable.lowercased())` \(op) \(endStr)) as LingoValue).asBool() {\n"
             for stmt in body {
                 output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
@@ -288,14 +313,14 @@ public final class LingoTranspiler {
             output += "\(indent)}\n"
         case .repeatWhile(let cond, let body):
             let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
-            output += "\(indent)while (\(condStr)).asBool() {\n"
+            output += "\(indent)while (\(condStr) as LingoValue).asBool() {\n"
             for stmt in body {
                 output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
             output += "\(indent)}\n"
         case .repeatWithIn(let variable, let list, let body):
             let listStr = transpile(expression: list, locals: locals, isMethod: isMethod)
-            output += "\(indent)for lingoItem in \(listStr) {\n"
+            output += "\(indent)for lingoItem in \(listStr).asSequence() {\n"
             output += "\(indent)    `\(variable.lowercased())` = lingoItem\n"
             for stmt in body {
                 output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
@@ -303,7 +328,7 @@ public final class LingoTranspiler {
             output += "\(indent)}\n"
         case .expressionStatement(let expr):
             let exprStr = transpile(expression: expr, locals: locals, isMethod: isMethod)
-            output += "\(indent)_ = \(exprStr)\n"
+            output += "\(indent)let _ : LingoValue = \(exprStr)\n"
         case .returnStatement(let expr):
             if activeHandlerIsInitializer {
                 if let expr, !expr.isMeReference {
@@ -413,16 +438,16 @@ public final class LingoTranspiler {
 
     private func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
         switch expression {
-        case .void: return ".void"
-        case .integer(let v): return ".integer(\(v))"
-        case .float(let v): return ".float(\(v))"
-        case .string(let v): return ".string(\"\(escapeSwiftString(v))\")"
-        case .symbol(let v): return ".symbol(\"\(escapeSwiftString(v))\")"
-        case .boolean(let v): return ".integer(\(v ? 1 : 0))"
+        case .void: return "LingoValue.void"
+        case .integer(let v): return "LingoValue.integer(\(v))"
+        case .float(let v): return "LingoValue.float(\(v))"
+        case .string(let v): return "LingoValue.string(\"\(escapeSwiftString(v))\")"
+        case .symbol(let v): return "LingoValue.symbol(\"\(escapeSwiftString(v))\")"
+        case .boolean(let v): return "LingoValue.integer(\(v ? 1 : 0))"
         case .identifier(let name):
             let lower = name.lowercased()
             if lower == "me" { return "LingoValue.object(self)" }
-            if lower == "void" { return ".void" }
+            if lower == "void" { return "LingoValue.void" }
             if locals.contains(lower) {
                 return "`\(lower)`"
             }
@@ -484,12 +509,12 @@ public final class LingoTranspiler {
             return "(\(op.rawValue)\(opr))"
         case .list(let items):
             let itemsStr = items.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
-            return ".list([\(itemsStr)])"
+            return "LingoValue.list([\(itemsStr)])"
         case .propertyList(let entries):
             let entriesStr = entries.map {
                 "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod)))"
             }.joined(separator: ", ")
-            return ".propertyList([\(entriesStr)])"
+            return "LingoValue.propertyList([\(entriesStr)])"
         case .elementAccess(let target, let index):
             let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
             let iStr = transpile(expression: index, locals: locals, isMethod: isMethod)

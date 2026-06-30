@@ -421,20 +421,20 @@ struct LingoValueIndexingTests {
 struct LingoValueSetElementTests {
 
     @Test func setListElement() {
-        var list: LingoValue = .list([.integer(1), .integer(2), .integer(3)])
+        let list: LingoValue = .list([.integer(1), .integer(2), .integer(3)])
         list.setElement(index: .integer(2), value: .integer(99))
         #expect(LingoValue.equalsBool(lhs: list[.integer(2)], rhs: .integer(99)))
     }
 
     @Test func setListElementOutOfBounds() {
-        var list: LingoValue = .list([.integer(1)])
+        let list: LingoValue = .list([.integer(1)])
         list.setElement(index: .integer(5), value: .integer(99))
         // Should be unchanged
         #expect(LingoValue.equalsBool(lhs: list[.integer(1)], rhs: .integer(1)))
     }
 
     @Test func setPropertyListByIndex() {
-        var plist: LingoValue = .propertyList([
+        let plist: LingoValue = .propertyList([
             (key: .symbol("a"), value: .integer(1)),
             (key: .symbol("b"), value: .integer(2))
         ])
@@ -443,7 +443,7 @@ struct LingoValueSetElementTests {
     }
 
     @Test func setPropertyListByKey() {
-        var plist: LingoValue = .propertyList([
+        let plist: LingoValue = .propertyList([
             (key: .symbol("name"), value: .string("old"))
         ])
         plist.setElement(index: .symbol("name"), value: .string("new"))
@@ -451,7 +451,7 @@ struct LingoValueSetElementTests {
     }
 
     @Test func setPropertyListNewKey() {
-        var plist: LingoValue = .propertyList([
+        let plist: LingoValue = .propertyList([
             (key: .symbol("a"), value: .integer(1))
         ])
         plist.setElement(index: .symbol("b"), value: .integer(2))
@@ -543,12 +543,6 @@ struct LingoValueUtilitiesTests {
 @Suite("LingoValue RandomAccessCollection")
 struct LingoValueCollectionTests {
 
-    @Test func listStartAndEndIndex() {
-        let list: LingoValue = .list([.integer(1), .integer(2), .integer(3)])
-        #expect(list.startIndex == 0)
-        #expect(list.endIndex == 3)
-    }
-
     @Test func listZeroBasedSubscript() {
         let list: LingoValue = .list([.integer(10), .integer(20), .integer(30)])
         #expect(LingoValue.equalsBool(lhs: list[0], rhs: .integer(10)))
@@ -574,20 +568,14 @@ struct LingoValueCollectionTests {
     @Test func iterateList() {
         let list: LingoValue = .list([.integer(1), .integer(2), .integer(3)])
         var sum = 0
-        for item in list {
+        for item in list.asSequence() {
             if case .integer(let v) = item { sum += v }
         }
         #expect(sum == 6)
     }
 
-    @Test func emptyCollectionEndIndex() {
-        let v: LingoValue = .void
-        #expect(v.startIndex == 0)
-        #expect(v.endIndex == 0)
-    }
-
     @Test func listCount() {
         let list: LingoValue = .list([.integer(1), .integer(2)])
-        #expect(list.count == 2)
+        #expect(list.count.asInteger() == 2)
     }
 }

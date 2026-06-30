@@ -1,6 +1,16 @@
 // LingoValue.swift
 // LingoRuntime module - Embedded Swift compatible
 
+public final class LingoListClass: @unchecked Sendable {
+    public var elements: [LingoValue]
+    public init(_ elements: [LingoValue]) { self.elements = elements }
+}
+
+public final class LingoPropertyListClass: @unchecked Sendable {
+    public var elements: [(key: LingoValue, value: LingoValue)]
+    public init(_ elements: [(key: LingoValue, value: LingoValue)]) { self.elements = elements }
+}
+
 /// Represents a value in the Lingo runtime.
 @dynamicMemberLookup
 @dynamicCallable
@@ -10,15 +20,32 @@ public enum LingoValue {
     case float(Double)
     case string(String)
     case symbol(String)
-    case list([LingoValue])
-    case propertyList([(key: LingoValue, value: LingoValue)])
+    case listType(LingoListClass)
+    case propertyListType(LingoPropertyListClass)
     case object(LingoObject)
     case boundMethod(LingoObject, String)
     case globalFunction(String)
 
+    public static func list(_ elements: [LingoValue]) -> LingoValue {
+        return .listType(LingoListClass(elements))
+    }
+
+    public static func propertyList(_ elements: [(key: LingoValue, value: LingoValue)]) -> LingoValue {
+        return .propertyListType(LingoPropertyListClass(elements))
+    }
+
     /// Accesses properties on Lingo objects dynamically.
     public subscript(dynamicMember member: String) -> LingoValue {
         get {
+            if member.caseInsensitiveEquals("count") {
+                switch self {
+                case .listType(let arr): return .integer(arr.elements.count)
+                case .propertyListType(let props): return .integer(props.elements.count)
+                case .string(let s): return .integer(s.count)
+                default: return .integer(0)
+                }
+            }
+
             if case .object(let obj) = self {
                 let prop = obj.getProperty(member)
                 if case .void = prop {} else { return prop }
@@ -45,19 +72,19 @@ public enum LingoValue {
     public subscript(index: LingoValue) -> LingoValue {
         get {
             switch self {
-            case .list(let arr):
+            case .listType(let arr):
                 if case .integer(let idx) = index {
-                    if idx >= 1 && idx <= arr.count {
-                        return arr[idx - 1]
+                    if idx >= 1 && idx <= arr.elements.count {
+                        return arr.elements[idx - 1]
                     }
                 }
-            case .propertyList(let props):
+            case .propertyListType(let props):
                 if case .integer(let idx) = index {
-                    if idx >= 1 && idx <= props.count {
-                        return props[idx - 1].value
+                    if idx >= 1 && idx <= props.elements.count {
+                        return props.elements[idx - 1].value
                     }
                 } else {
-                    for prop in props {
+                    for prop in props.elements {
                         if LingoValue.equalsBool(lhs: prop.key, rhs: index) {
                             return prop.value
                         }
@@ -81,31 +108,27 @@ public enum LingoValue {
     }
 
     /// Mutates an element at a given 1-based index or key.
-    public mutating func setElement(index: LingoValue, value: LingoValue) {
+    public func setElement(index: LingoValue, value: LingoValue) {
         switch self {
-        case .list(var arr):
+        case .listType(let arr):
             if case .integer(let idx) = index {
-                if idx >= 1 && idx <= arr.count {
-                    arr[idx - 1] = value
-                    self = .list(arr)
+                if idx >= 1 && idx <= arr.elements.count {
+                    arr.elements[idx - 1] = value
                 }
             }
-        case .propertyList(var props):
+        case .propertyListType(let props):
             if case .integer(let idx) = index {
-                if idx >= 1 && idx <= props.count {
-                    props[idx - 1].value = value
-                    self = .propertyList(props)
+                if idx >= 1 && idx <= props.elements.count {
+                    props.elements[idx - 1].value = value
                 }
             } else {
-                for i in 0..<props.count {
-                    if LingoValue.equalsBool(lhs: props[i].key, rhs: index) {
-                        props[i].value = value
-                        self = .propertyList(props)
+                for i in 0..<props.elements.count {
+                    if LingoValue.equalsBool(lhs: props.elements[i].key, rhs: index) {
+                        props.elements[i].value = value
                         return
                     }
                 }
-                props.append((key: index, value: value))
-                self = .propertyList(props)
+                props.elements.append((key: index, value: value))
             }
         default:
             break
@@ -178,15 +201,15 @@ public enum LingoValue {
         case (.symbol(let l), .string(let r)): return l.caseInsensitiveEquals(r)
         case (.string(let l), .symbol(let r)): return l.caseInsensitiveEquals(r)
         case (.object(let l), .object(let r)): return l === r
-        case (.list(let l), .list(let r)):
-            if l.count != r.count { return false }
-            for i in 0..<l.count { if !equalsBool(lhs: l[i], rhs: r[i]) { return false } }
+        case (.listType(let l), .listType(let r)):
+            if l.elements.count != r.elements.count { return false }
+            for i in 0..<l.elements.count { if !equalsBool(lhs: l.elements[i], rhs: r.elements[i]) { return false } }
             return true
-        case (.propertyList(let l), .propertyList(let r)):
-            if l.count != r.count { return false }
-            for i in 0..<l.count {
-                if !equalsBool(lhs: l[i].key, rhs: r[i].key) { return false }
-                if !equalsBool(lhs: l[i].value, rhs: r[i].value) { return false }
+        case (.propertyListType(let l), .propertyListType(let r)):
+            if l.elements.count != r.elements.count { return false }
+            for i in 0..<l.elements.count {
+                if !equalsBool(lhs: l.elements[i].key, rhs: r.elements[i].key) { return false }
+                if !equalsBool(lhs: l.elements[i].value, rhs: r.elements[i].value) { return false }
             }
             return true
         default: return false
@@ -237,6 +260,7 @@ public enum LingoValue {
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return .integer(l + r)
         case (.float(let l), .float(let r)): return .float(l + r)
+        case (.listType(let l), .listType(let r)): return .listType(LingoListClass(l.elements + r.elements))
         case (.integer(let l), .float(let r)): return .float(Double(l) + r)
         case (.float(let l), .integer(let r)): return .float(l + Double(r))
         case (.string(let l), .string(let r)): return .string(l + r)
@@ -365,8 +389,8 @@ public enum LingoValue {
         switch (self, other) {
         case (.string(let s), .string(let substr)):
             return s.caseInsensitiveContains(substr) ? .integer(1) : .integer(0)
-        case (.list(let arr), _):
-            for item in arr {
+        case (.listType(let l), _):
+            for item in l.elements {
                 if LingoValue.equalsBool(lhs: item, rhs: other) {
                     return .integer(1)
                 }
@@ -390,19 +414,16 @@ public func ~= (pattern: LingoValue, value: LingoValue) -> Bool {
     return LingoValue.equalsBool(lhs: pattern, rhs: value)
 }
 
-// MARK: - Swift Collection Conformance
+// MARK: - Swift Subscript
 
-extension LingoValue: RandomAccessCollection {
-    public typealias Index = Int
-    public typealias Element = LingoValue
-
-    public var startIndex: Int { 0 }
-
-    public var endIndex: Int {
+extension LingoValue {
+    /// Explicit count property to shadow Sequence.count(where:)
+    public var count: LingoValue {
         switch self {
-        case .list(let arr): return arr.count
-        case .propertyList(let props): return props.count
-        default: return 0
+        case .listType(let arr): return .integer(arr.elements.count)
+        case .propertyListType(let props): return .integer(props.elements.count)
+        case .string(let s): return .integer(s.count)
+        default: return .integer(0)
         }
     }
 
@@ -410,22 +431,32 @@ extension LingoValue: RandomAccessCollection {
     public subscript(position: Int) -> LingoValue {
         get {
             switch self {
-            case .list(let arr): return arr[position]
-            case .propertyList(let props): return props[position].value
+            case .listType(let arr): return arr.elements[position]
+            case .propertyListType(let props): return props.elements[position].value
             default: return .void
             }
         }
         set {
             switch self {
-            case .list(var arr):
-                arr[position] = newValue
-                self = .list(arr)
-            case .propertyList(var props):
-                props[position].value = newValue
-                self = .propertyList(props)
+            case .listType(let arr):
+                arr.elements[position] = newValue
+            case .propertyListType(let props):
+                props.elements[position].value = newValue
             default:
                 break
             }
+        }
+    }
+}
+
+// MARK: - Swift Iteration Support
+
+extension LingoValue {
+    public func asSequence() -> [LingoValue] {
+        switch self {
+        case .listType(let arr): return arr.elements
+        case .propertyListType(let props): return props.elements.map { $0.value }
+        default: return []
         }
     }
 }

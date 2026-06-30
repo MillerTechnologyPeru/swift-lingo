@@ -24,14 +24,18 @@ SwiftLingo
 
 ## How Transpilation Works
 
-Each `.ls` file becomes a Swift class named after the file (PascalCase) that subclasses `LingoObject`:
+Each `.ls` file becomes a Swift class named after the file (PascalCase) that subclasses `LingoObject`. Handlers map to Swift functions, with default parameters to match Lingo's optional arguments, and properties are correctly hoisted and managed dynamically.
 
 **Input (`Button.ls`)**
 ```lingo
 property activated
 
-on new me
-  activated = 0
+on new me, startingState
+  if voidP(startingState) then
+    activated = 0
+  else
+    activated = startingState
+  end if
   return me
 end
 
@@ -49,21 +53,34 @@ import LingoRuntime
 public class Button: LingoObject {
     public var `activated`: LingoValue = .void
 
-    public override func getProperty(_ name: String) -> LingoValue { … }
-    public override func setProperty(_ name: String, value: LingoValue) { … }
-    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue { … }
-
-    public override init() {
-        super.init()
-        // activated = 0
-        self.`activated` = .integer(0)
+    public override func getProperty(_ name: String) -> LingoValue { ... }
+    public override func setProperty(_ name: String, value: LingoValue) { ... }
+    
+    private enum MethodName: String {
+        case `mouseup` = "mouseup"
     }
 
-    public func `mouseUp`() -> LingoValue {
+    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue { ... }
+
+    public init(_ `startingstate`: LingoValue = LingoValue.void) {
+        super.init()
+        var `startingstate`: LingoValue = `startingstate`
+
+        // if voidP(startingState) then
+        if (lingo_voidp(`startingstate`)).asBool() {
+            // activated = 0
+            self.`activated` = LingoValue.integer(0)
+        } else {
+            // activated = startingState
+            self.`activated` = `startingstate`
+        }
+    }
+
+    public func `mouseup`() -> LingoValue {
         // activated = 1
-        self.`activated` = .integer(1)
+        self.`activated` = LingoValue.integer(1)
         // me.doAction()
-        _ = self.`doAction`()
+        let _ : LingoValue = self.`doaction`()
         return .void
     }
 }
@@ -77,20 +94,25 @@ Files whose names begin with `movie_` are treated as **movie scripts** and trans
 
 | Type | Role |
 |---|---|
-| `LingoValue` | Tagged union: `.void`, `.integer`, `.float`, `.string`, `.symbol`, `.list`, `.propertyList`, `.object`, `.boundMethod` |
-| `LingoObject` | Base class for transpiled scripts; dynamic member lookup and `callMethod` dispatch |
+| `LingoValue` | Tagged enum: `.void`, `.integer`, `.float`, `.string`, `.symbol`, `.list`, `.propertyList`, `.object`, `.boundMethod` |
+| `LingoObject` | Base class for transpiled scripts; uses `@dynamicMemberLookup` and `@dynamicCallable` |
 | `LingoEnvironment` | Singleton holding global variables and global function handlers |
 
-`LingoValue` implements the Lingo semantics you'd expect: case-insensitive string comparison, 1-based list/string indexing, chunk expressions (`char`, `word`, `item`, `line`), and arithmetic coercions.
+`LingoValue` implements the Lingo semantics you'd expect: 
+- Case-insensitive string and symbol comparisons.
+- Native implicit type coercions for operators.
+- 1-based indexing for strings and lists.
+- Chunk expressions (`char`, `word`, `item`, `line`).
+- Safe optional parameter defaults (`LingoValue.void`).
 
 ## CLI Usage
 
 ```sh
 # Transpile a single file
-swiftlingoc path/to/Button.ls OutputDir/
+swift run swiftlingoc path/to/Button.ls OutputDir/
 
 # Transpile an entire directory of .ls files
-swiftlingoc path/to/Scripts/ OutputDir/
+swift run swiftlingoc path/to/Scripts/ OutputDir/
 ```
 
 Generated files are named by replacing `/` with `_` in the relative path and changing `.ls` → `.swift`, so `Actors/Button.ls` → `Actors_Button.swift`.
@@ -113,10 +135,10 @@ Add `LingoTranspilerPlugin` to any target that contains `.ls` files and the tran
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/PureSwift/swift-lingo", from: "0.1.0"),
+.package(url: "https://github.com/MillerTechnologyPeru/swift-lingo", branch: "main"),
 ```
 
-Available products: `LingoRuntime`, `LingoAST`, `LingoParser`, `LingoTranspiler`, `LingoTranspilerPlugin`.
+Available products: `LingoRuntime`, `LingoAST`, `LingoParser`, `LingoTranspiler`, `LingoTranspilerPlugin`, `swiftlingoc`.
 
 ## Requirements
 

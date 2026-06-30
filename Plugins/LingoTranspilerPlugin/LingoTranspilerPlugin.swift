@@ -9,10 +9,10 @@ struct LingoTranspilerPlugin: BuildToolPlugin {
         }
 
         let lingoc = try context.tool(named: "swiftlingoc")
-        let outputDir = context.pluginWorkDirectory.appending("GeneratedLingo")
+        let outputDir = context.pluginWorkDirectoryURL.appendingPathComponent("GeneratedLingo")
 
         // Find all .ls files in the target
-        let lsFiles = sourceTarget.sourceFiles.filter { $0.path.extension == "ls" }
+        let lsFiles = sourceTarget.sourceFiles.filter { $0.url.pathExtension == "ls" }
         guard !lsFiles.isEmpty else { return [] }
 
         // Since lingoc currently takes a directory or file, and outputs to a directory
@@ -20,27 +20,27 @@ struct LingoTranspilerPlugin: BuildToolPlugin {
         // Wait, the source files might be scattered. We'll pass the target's directory.
         // And swiftlingoc will process them all.
 
-        let inputDir = sourceTarget.directory
+        let inputDir = sourceTarget.directoryURL
 
         // Output files we expect to be generated (for the build system to track)
         // To accurately track, we need to know the generated filenames.
         // Our CLI disambiguates by relative path.
-        var outputFiles: [Path] = []
+        var outputFiles: [URL] = []
         for file in lsFiles {
-            let relativeString = file.path.string.replacingOccurrences(of: inputDir.string + "/", with: "")
+            let relativeString = file.url.path.replacingOccurrences(of: inputDir.path + "/", with: "")
             let disambiguatedName = relativeString.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ".ls", with: ".swift")
-            outputFiles.append(outputDir.appending(disambiguatedName))
+            outputFiles.append(outputDir.appendingPathComponent(disambiguatedName))
         }
 
         return [
             .buildCommand(
                 displayName: "Transpiling Lingo scripts",
-                executable: lingoc.path,
+                executable: lingoc.url,
                 arguments: [
-                    inputDir.string,
-                    outputDir.string
+                    inputDir.path,
+                    outputDir.path
                 ],
-                inputFiles: lsFiles.map { $0.path },
+                inputFiles: lsFiles.map { $0.url },
                 outputFiles: outputFiles
             )
         ]
