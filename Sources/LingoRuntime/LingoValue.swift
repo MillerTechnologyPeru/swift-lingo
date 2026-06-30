@@ -32,6 +32,12 @@ public enum LingoValue {
         }
     }
     
+    public func setProperty(_ name: String, value: LingoValue) {
+        if case .object(let obj) = self {
+            obj.setProperty(name, value: value)
+        }
+    }
+    
     public subscript(index: LingoValue) -> LingoValue {
         get {
             return .void // TODO: List indexing and property list lookup
@@ -39,6 +45,10 @@ public enum LingoValue {
         nonmutating set {
             // TODO: List element assignment
         }
+    }
+    
+    public func setElement(index: LingoValue, value: LingoValue) {
+        // TODO: List element assignment
     }
     
     public func getRange(start: LingoValue, end: LingoValue) -> LingoValue {
