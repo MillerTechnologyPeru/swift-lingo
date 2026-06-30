@@ -70,6 +70,7 @@ public indirect enum Expression: Equatable {
     case unaryOperation(operator: UnaryOperator, operand: Expression)
     
     case chunkExpression(type: ChunkType, first: Expression, last: Expression?, string: Expression) // e.g. word 1 of Entry
+    case elementRangeAccess(target: Expression, start: Expression, end: Expression)
     case lastStringChunk(type: ChunkType, obj: Expression)
     case stringChunkCount(type: ChunkType, obj: Expression)
     
@@ -116,6 +117,8 @@ public enum BinaryOperator: String, Equatable {
     case logicalOr = "or"
     case stringConcat = "&"
     case stringConcatSpace = "&&"
+    case contains = "contains"
+    case starts = "starts"
 }
 
 public enum UnaryOperator: String, Equatable {
@@ -127,4 +130,5 @@ public enum PutType: Equatable {
     case into
     case after
     case before
+    case display
 }

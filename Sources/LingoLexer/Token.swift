@@ -13,6 +13,7 @@ public enum Token: Equatable {
     case colon
     case comma
     case dot
+    case range // ..
     
     // Operators
     case plus

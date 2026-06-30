@@ -108,7 +108,14 @@ public struct Lexer {
             case "]": tokens.append(.rightBracket); advance()
             case ":": tokens.append(.colon); advance()
             case ",": tokens.append(.comma); advance()
-            case ".": tokens.append(.dot); advance()
+            case ".":
+                advance()
+                if currentIndex < input.endIndex && input[currentIndex] == "." {
+                    tokens.append(.range)
+                    advance()
+                } else {
+                    tokens.append(.dot)
+                }
             case "+": tokens.append(.plus); advance()
             case "*": tokens.append(.multiply); advance()
             case "/": tokens.append(.divide); advance()
