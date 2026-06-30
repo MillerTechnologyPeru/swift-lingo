@@ -206,7 +206,7 @@ public class LingoTranspiler {
     }
     
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
-        var output = "\(indent)// \(statement.lingoString)\n"
+        var output = "\(indent)// \(statement.toLingoSource())\n"
         switch statement {
         case .global, .property:
             break

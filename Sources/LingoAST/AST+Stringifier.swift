@@ -1,17 +1,17 @@
 import Foundation
 
 extension Script {
-    public func toLingoSource() -> String {
+    public func toLingoSource(indent: Int = 0) -> String {
         var output = ""
         for stmt in statements {
-            output += stmt.toLingoSource(indent: 0) + "\n"
+            output += stmt.toLingoSource(indent: indent) + "\n"
         }
         return output
     }
 }
 
 extension Statement {
-    public func toLingoSource(indent: Int) -> String {
+    public func toLingoSource(indent: Int = 0) -> String {
         let pad = String(repeating: "  ", count: indent)
         switch self {
         case .global(let names):
@@ -176,6 +176,9 @@ extension Expression {
         case .binaryOperation(let left, let op, let right):
             return "\(left.toLingoSource()) \(op.rawValue) \(right.toLingoSource())"
         case .unaryOperation(let op, let operand):
+            if op == .not {
+                return "not \(operand.toLingoSource())"
+            }
             return "\(op.rawValue)\(operand.toLingoSource())"
         case .chunkExpression(let type, let first, let last, let string):
             let lastStr = last != nil ? " to \(last!.toLingoSource())" : ""
