@@ -318,7 +318,7 @@ public enum LingoValue {
     }
     
     private func splitIntoChunks(_ string: String, type: String) -> [String] {
-        switch type.lowercased() {
+        switch type.asciiLowercased() {
         case "char": return string.map { String($0) }
         case "word": return string.split { $0 == " " || $0 == "\n" || $0 == "\t" }.map(String.init)
         case "item": return string.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
@@ -328,7 +328,7 @@ public enum LingoValue {
     }
     
     private func chunkJoiner(for type: String) -> String {
-        switch type.lowercased() {
+        switch type.asciiLowercased() {
         case "word": return " "
         case "item": return ","
         case "line": return "\n"
