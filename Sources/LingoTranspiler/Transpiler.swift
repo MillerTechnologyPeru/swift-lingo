@@ -365,7 +365,7 @@ public class LingoTranspiler {
     
     private func transpileMemberSpritePropertyAssignment(target: LingoAST.Expression, value: String, locals: Set<String>, isMethod: Bool) -> String? {
         guard case .member(let type, let id, nil) = target,
-              type.lowercased() == "member" else { return nil }
+              type.lowercased() == "member" || type.lowercased() == "sprite" else { return nil }
         
         let chain = propertyChain(from: id)
         guard case .identifier(let baseName) = chain.base,
