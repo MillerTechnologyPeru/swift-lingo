@@ -5,6 +5,7 @@ public class LingoEnvironment {
     nonisolated(unsafe) public static let shared = LingoEnvironment()
     
     private var globals: [(key: String, value: LingoValue)] = []
+    private var globalFunctions: [(key: String, value: ([LingoValue]) -> LingoValue)] = []
     
     public init() {}
     
@@ -29,7 +30,23 @@ public class LingoEnvironment {
         globals.append((key: lower, value: value))
     }
     
+    public func registerGlobalFunction(_ name: String, _ function: @escaping ([LingoValue]) -> LingoValue) {
+        let lower = name.lowercased()
+        globalFunctions.append((key: lower, value: function))
+    }
+    
+    public func callGlobal(_ name: String, args: [LingoValue]) -> LingoValue {
+        let lower = name.lowercased()
+        for i in 0..<globalFunctions.count {
+            if globalFunctions[i].key == lower {
+                return globalFunctions[i].value(args)
+            }
+        }
+        return .void
+    }
+    
     public func clear() {
         globals = []
+        globalFunctions = []
     }
 }
