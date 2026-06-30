@@ -316,6 +316,29 @@ public enum LingoValue {
         default: return nil
         }
     }
+
+    /// String form used by the concatenation operators (`&` and `&&`),
+    /// which coerce numbers to strings before joining.
+    public func asString() -> String {
+        switch self {
+        case .string(let v): return v
+        case .symbol(let v): return v
+        case .integer(let v): return "\(v)"
+        case .float(let v): return "\(v)"
+        case .void: return ""
+        default: return ""
+        }
+    }
+
+    /// Lingo `&` operator: concatenates the string forms of both values.
+    public func concat(_ other: LingoValue) -> LingoValue {
+        return .string(self.asString() + other.asString())
+    }
+
+    /// Lingo `&&` operator: concatenates the string forms with a single space between them.
+    public func concatSpace(_ other: LingoValue) -> LingoValue {
+        return .string(self.asString() + " " + other.asString())
+    }
     
     private func splitIntoChunks(_ string: String, type: String) -> [String] {
         switch type.asciiLowercased() {
