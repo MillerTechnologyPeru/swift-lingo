@@ -24,27 +24,60 @@ public class LingoTranspiler {
                 }
             }
             
+            // Emit CodingKeys enum if there are properties
+            if !properties.isEmpty {
+                output += "    /// Property keys for type-safe property access.\n"
+                output += "    public enum CodingKeys: String, Sendable, CaseIterable {\n"
+                for prop in properties {
+                    output += "        case `\(prop)` = \"\(prop.lowercased())\"\n"
+                }
+                output += "\n"
+                output += "        /// Case-insensitive lookup without Unicode data tables.\n"
+                output += "        public static func find(_ name: String) -> CodingKeys? {\n"
+                output += "            for key in allCases {\n"
+                output += "                if name.caseInsensitiveEquals(key.rawValue) {\n"
+                output += "                    return key\n"
+                output += "                }\n"
+                output += "            }\n"
+                output += "            return nil\n"
+                output += "        }\n"
+                output += "    }\n\n"
+            }
+            
             for prop in properties {
                 output += "    public var `\(prop)`: LingoValue = .void\n"
             }
             if !properties.isEmpty { output += "\n" }
             
             output += "    public override func getProperty(_ name: String) -> LingoValue {\n"
-            output += "        switch name.lowercased() {\n"
-            for prop in properties {
-                output += "        case \"\(prop.lowercased())\": return self.`\(prop)`\n"
+            if !properties.isEmpty {
+                output += "        guard let key = CodingKeys.find(name) else {\n"
+                output += "            return super.getProperty(name)\n"
+                output += "        }\n"
+                output += "        switch key {\n"
+                for prop in properties {
+                    output += "        case .`\(prop)`: return self.`\(prop)`\n"
+                }
+                output += "        }\n"
+            } else {
+                output += "        return super.getProperty(name)\n"
             }
-            output += "        default: return super.getProperty(name)\n"
-            output += "        }\n"
             output += "    }\n\n"
             
             output += "    public override func setProperty(_ name: String, value: LingoValue) {\n"
-            output += "        switch name.lowercased() {\n"
-            for prop in properties {
-                output += "        case \"\(prop.lowercased())\": self.`\(prop)` = value\n"
+            if !properties.isEmpty {
+                output += "        guard let key = CodingKeys.find(name) else {\n"
+                output += "            super.setProperty(name, value: value)\n"
+                output += "            return\n"
+                output += "        }\n"
+                output += "        switch key {\n"
+                for prop in properties {
+                    output += "        case .`\(prop)`: self.`\(prop)` = value\n"
+                }
+                output += "        }\n"
+            } else {
+                output += "        super.setProperty(name, value: value)\n"
             }
-            output += "        default: super.setProperty(name, value: value)\n"
-            output += "        }\n"
             output += "    }\n\n"
             
             for stmt in script.statements {
