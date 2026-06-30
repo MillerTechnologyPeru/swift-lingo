@@ -1,0 +1,17 @@
+name: Swift Format
+on: [push]
+
+jobs:
+  lint:
+    name: Validate Formatting
+    runs-on: ubuntu-latest
+    container: swift:6.3.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Check Swift Version
+        run: swift --version
+      
+      - name: Run swift-format
+        run: swift-format lint -s -r .
