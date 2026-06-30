@@ -147,9 +147,9 @@ public class Parser {
             return .returnStatement(expr)
         } else if matchKeyword("exit") {
             if matchKeyword("repeat") {
-                return .exitStatement // Or maybe a separate exitRepeat token
+                return .exitRepeat
             }
-            return .exitStatement
+            return .exit
         } else if matchKeyword("next") {
             if matchKeyword("repeat") {
                 return .nextRepeat
@@ -173,13 +173,55 @@ public class Parser {
             guard let value = parseExpression() else { return nil }
             if matchKeyword("into") {
                 if let target = parseExpression() {
-                    return .putInto(value: value, target: target)
+                    return .put(type: .into, value: value, target: target)
+                }
+            } else if matchKeyword("after") {
+                if let target = parseExpression() {
+                    return .put(type: .after, value: value, target: target)
+                }
+            } else if matchKeyword("before") {
+                if let target = parseExpression() {
+                    return .put(type: .before, value: value, target: target)
                 }
             }
         } else if matchKeyword("delete") {
              // simplified delete support
              guard let target = parseExpression() else { return nil }
-             return .expressionStatement(target) // Representing delete as expression statement for now
+             return .chunkDelete(chunk: target) 
+        } else if matchKeyword("hilite") {
+             guard let target = parseExpression() else { return nil }
+             return .chunkHilite(chunk: target)
+        } else if matchKeyword("tell") {
+            guard let window = parseExpression() else { return nil }
+            var body: [Statement] = []
+            while !isAtEnd {
+                skipNewlines()
+                if matchKeyword("end") {
+                    _ = matchKeyword("tell")
+                    break
+                }
+                if let stmt = parseStatement() {
+                    body.append(stmt)
+                }
+            }
+            return .tell(window: window, body: body)
+        } else if matchKeyword("play") {
+            let args = check(.newline) ? nil : parseExpression()
+            return .playCmd(args: args)
+        } else if matchKeyword("sound") {
+            if case .identifier(let cmd) = peek() {
+                _ = advance()
+                let args = check(.newline) ? nil : parseExpression()
+                return .soundCmd(cmd: cmd, args: args)
+            }
+        } else if matchKeyword("when") {
+            if case .identifier(let eventName) = advance() {
+                _ = matchKeyword("then")
+                if case .identifier(let scriptName) = peek() {
+                    _ = advance()
+                    return .when(event: eventName, script: scriptName)
+                }
+            }
         }
         
         // Otherwise, probably an assignment (x = y) or expression (foo())
@@ -259,7 +301,7 @@ public class Parser {
                         body.append(stmt)
                     }
                 }
-                return .repeatWithCounter(variable: varName, start: startExpr, end: endExpr, body: body)
+                return .repeatWithCounter(variable: varName, start: startExpr, end: endExpr, body: body, up: true)
             } else if matchKeyword("in") {
                 // repeat with x in list
                 guard let listExpr = parseExpression() else { return nil }
@@ -361,6 +403,7 @@ public class Parser {
     
     private func parseBinaryExpression(precedence: Int) -> Expression? {
         var left = parsePrimary()
+        guard left != nil else { return nil }
         
         while !isAtEnd {
             let opToken = peek()
@@ -434,13 +477,74 @@ public class Parser {
                 return .unaryOperation(operator: .not, operand: expr)
             }
         } else if matchKeyword("the") {
-            // the property of obj
-            if case .identifier(let prop) = advance() {
+            if matchKeyword("last") {
+                if matchKeyword("char") {
+                    _ = matchKeyword("of")
+                    if let target = parsePrimary() { return .lastStringChunk(type: .char, obj: target) }
+                } else if matchKeyword("word") {
+                    _ = matchKeyword("of")
+                    if let target = parsePrimary() { return .lastStringChunk(type: .word, obj: target) }
+                } else if matchKeyword("item") {
+                    _ = matchKeyword("of")
+                    if let target = parsePrimary() { return .lastStringChunk(type: .item, obj: target) }
+                } else if matchKeyword("line") {
+                    _ = matchKeyword("of")
+                    if let target = parsePrimary() { return .lastStringChunk(type: .line, obj: target) }
+                }
+            } else if matchKeyword("number") {
                 if matchKeyword("of") {
-                    if let target = parsePrimary() {
-                        return .propertyAccess(target: target, property: prop)
+                    if matchKeyword("chars") {
+                        _ = matchKeyword("in")
+                        if let target = parsePrimary() { return .stringChunkCount(type: .char, obj: target) }
+                    } else if matchKeyword("words") {
+                        _ = matchKeyword("in")
+                        if let target = parsePrimary() { return .stringChunkCount(type: .word, obj: target) }
+                    } else if matchKeyword("items") {
+                        _ = matchKeyword("in")
+                        if let target = parsePrimary() { return .stringChunkCount(type: .item, obj: target) }
+                    } else if matchKeyword("lines") {
+                        _ = matchKeyword("in")
+                        if let target = parsePrimary() { return .stringChunkCount(type: .line, obj: target) }
                     }
                 }
+            }
+            
+            if case .identifier(let prop) = advance() {
+                if matchKeyword("of") {
+                    if matchKeyword("menu") {
+                        if let menuId = parsePrimary() {
+                            return .menuProp(menuId: menuId, prop: prop)
+                        }
+                    } else if matchKeyword("menuItem") {
+                        if let itemId = parsePrimary() {
+                            _ = matchKeyword("of")
+                            _ = matchKeyword("menu")
+                            if let menuId = parsePrimary() {
+                                return .menuItemProp(menuId: menuId, itemId: itemId, prop: prop)
+                            }
+                        }
+                    } else if matchKeyword("sound") {
+                        if let soundId = parsePrimary() {
+                            return .soundProp(soundId: soundId, prop: prop)
+                        }
+                    } else if matchKeyword("sprite") {
+                        if let spriteId = parsePrimary() {
+                            return .spriteProp(spriteId: spriteId, prop: prop)
+                        }
+                    } else if let target = parsePrimary() {
+                        return .theProp(obj: target, prop: prop)
+                    }
+                }
+                return .the(prop)
+            }
+        } else if matchKeyword("sprite") {
+            if let spriteId = parsePrimary() {
+                if matchKeyword("intersects") {
+                    if let target = parsePrimary() { return .spriteIntersects(first: spriteId, second: target) }
+                } else if matchKeyword("within") {
+                    if let target = parsePrimary() { return .spriteWithin(first: spriteId, second: target) }
+                }
+                return .member(type: "sprite", id: spriteId, castId: nil)
             }
         } else if matchKeyword("char") {
              return parseChunk(.char)
@@ -560,6 +664,6 @@ public class Parser {
          }
          _ = matchKeyword("of")
          guard let target = parsePrimary() else { return nil }
-         return .chunkExpression(type: type, index: index, target: target)
+         return .chunkExpression(type: type, first: index, last: nil, string: target)
     }
 }

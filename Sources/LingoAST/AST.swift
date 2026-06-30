@@ -11,16 +11,23 @@ public enum Statement: Equatable {
     case property(names: [String])
     case handler(name: String, arguments: [String], body: [Statement])
     case assignment(target: Expression, value: Expression)
-    case putInto(value: Expression, target: Expression)
+    case put(type: PutType, value: Expression, target: Expression?)
     case ifStatement(condition: Expression, body: [Statement], elseBody: [Statement]?)
-    case repeatWithCounter(variable: String, start: Expression, end: Expression, body: [Statement])
+    case repeatWithCounter(variable: String, start: Expression, end: Expression, body: [Statement], up: Bool)
     case repeatWhile(condition: Expression, body: [Statement])
     case repeatWithIn(variable: String, list: Expression, body: [Statement])
     case expressionStatement(Expression)
     case returnStatement(Expression?)
-    case exitStatement
+    case exit
+    case exitRepeat
     case nextRepeat
     case caseStatement(condition: Expression, cases: [CaseBlock], otherwise: [Statement]?)
+    case tell(window: Expression, body: [Statement])
+    case when(event: String, script: String)
+    case soundCmd(cmd: String, args: Expression?)
+    case playCmd(args: Expression?)
+    case chunkHilite(chunk: Expression)
+    case chunkDelete(chunk: Expression)
 }
 
 public struct CaseBlock: Equatable {
@@ -34,6 +41,7 @@ public struct CaseBlock: Equatable {
 }
 
 public indirect enum Expression: Equatable {
+    case void
     case integer(Int)
     case float(Double)
     case string(String)
@@ -41,18 +49,38 @@ public indirect enum Expression: Equatable {
     case boolean(Bool)
     
     case identifier(String)
+    case the(String)
+    case theProp(obj: Expression, prop: String)
+    case objProp(obj: Expression, prop: String)
     case propertyAccess(target: Expression, property: String) // object.property or the property of object
     case elementAccess(target: Expression, index: Expression) // array[index]
+    case objPropIndex(obj: Expression, prop: String, index: Expression, index2: Expression?)
     
     case list([Expression]) // [1, 2, 3]
     case propertyList([PropertyListEntry]) // [#key: value]
+    case argList([Expression])
+    case argListNoRet([Expression])
     
     case functionCall(target: Expression?, name: String, arguments: [Expression]) // obj.method(args) or function(args)
+    case call(name: String, args: Expression)
+    case objCall(name: String, args: Expression)
+    case objCallV4(obj: Expression, args: Expression)
     
     case binaryOperation(left: Expression, operator: BinaryOperator, right: Expression)
     case unaryOperation(operator: UnaryOperator, operand: Expression)
     
-    case chunkExpression(type: ChunkType, index: Expression, target: Expression) // e.g. word 1 of Entry
+    case chunkExpression(type: ChunkType, first: Expression, last: Expression?, string: Expression) // e.g. word 1 of Entry
+    case lastStringChunk(type: ChunkType, obj: Expression)
+    case stringChunkCount(type: ChunkType, obj: Expression)
+    
+    case spriteIntersects(first: Expression, second: Expression)
+    case spriteWithin(first: Expression, second: Expression)
+    case member(type: String, id: Expression, castId: Expression?)
+    case menuProp(menuId: Expression, prop: String)
+    case menuItemProp(menuId: Expression, itemId: Expression, prop: String)
+    case soundProp(soundId: Expression, prop: String)
+    case spriteProp(spriteId: Expression, prop: String)
+    case newObj(type: String, args: Expression)
 }
 
 public struct PropertyListEntry: Equatable {
@@ -93,4 +121,10 @@ public enum BinaryOperator: String, Equatable {
 public enum UnaryOperator: String, Equatable {
     case negate = "-"
     case not = "not"
+}
+
+public enum PutType: Equatable {
+    case into
+    case after
+    case before
 }
