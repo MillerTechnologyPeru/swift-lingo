@@ -214,7 +214,8 @@ public final class LingoTranspiler {
     }
 
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
-        var output = "\(indent)// \(statement.toLingoSource())\n"
+        let commentedSource = statement.toLingoSource().split(separator: "\n", omittingEmptySubsequences: false).map { "\(indent)// \($0)" }.joined(separator: "\n")
+        var output = "\(commentedSource)\n"
         switch statement {
         case .global, .property:
             break
