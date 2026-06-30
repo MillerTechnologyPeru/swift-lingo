@@ -3,7 +3,7 @@
 
 @dynamicMemberLookup
 @dynamicCallable
-public enum LingoValue: Equatable {
+public enum LingoValue {
     case void
     case integer(Int)
     case float(Double)
@@ -19,7 +19,7 @@ public enum LingoValue: Equatable {
         get {
             if case .object(let obj) = self {
                 let prop = obj.getProperty(member)
-                if prop != .void { return prop }
+                if case .void = prop {} else { return prop }
                 return .boundMethod(obj, member)
             }
             // For now, property lookups on lists/strings are ignored or return void
@@ -66,24 +66,23 @@ public enum LingoValue: Equatable {
         }
     }
     
-    public static func ==(lhs: LingoValue, rhs: LingoValue) -> Bool {
+    public static func ==(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         switch (lhs, rhs) {
-        case (.void, .void): return true
-        case (.integer(let l), .integer(let r)): return l == r
-        case (.float(let l), .float(let r)): return l == r
-        case (.string(let l), .string(let r)): return l == r
-        case (.symbol(let l), .symbol(let r)): return l == r
-        case (.list(let l), .list(let r)): return l == r
+        case (.void, .void): return .integer(1)
+        case (.integer(let l), .integer(let r)): return (l == r) ? .integer(1) : .integer(0)
+        case (.float(let l), .float(let r)): return (l == r) ? .integer(1) : .integer(0)
+        case (.integer(let l), .float(let r)): return (Double(l) == r) ? .integer(1) : .integer(0)
+        case (.float(let l), .integer(let r)): return (l == Double(r)) ? .integer(1) : .integer(0)
+        case (.string(let l), .string(let r)): return (l == r) ? .integer(1) : .integer(0)
+        case (.symbol(let l), .symbol(let r)): return (l == r) ? .integer(1) : .integer(0)
+        case (.symbol(let l), .string(let r)): return (l == r) ? .integer(1) : .integer(0)
+        case (.string(let l), .symbol(let r)): return (l == r) ? .integer(1) : .integer(0)
+        case (.object(let l), .object(let r)): return (l === r) ? .integer(1) : .integer(0)
+        case (.list(let l), .list(let r)):
+            return .integer(0) // TODO: Deep compare list
         case (.propertyList(let l), .propertyList(let r)):
-            if l.count != r.count { return false }
-            for i in 0..<l.count {
-                if l[i].key != r[i].key || l[i].value != r[i].value { return false }
-            }
-            return true
-        case (.object(let l), .object(let r)):
-            return l === r
-        default:
-            return false
+            return .integer(0) // TODO: Deep compare prop list
+        default: return .integer(0)
         }
     }
     
@@ -164,10 +163,10 @@ open class LingoObject {
     public subscript(dynamicMember member: String) -> LingoValue {
         get {
             let prop = getProperty(member)
-            if prop != .void { return prop }
+            if case .void = prop {} else { return prop }
             
             let glob = LingoEnvironment.shared.getGlobal(member)
-            if glob != .void { return glob }
+            if case .void = glob {} else { return glob }
             
             return .boundMethod(self, member)
         }
