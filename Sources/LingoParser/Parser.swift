@@ -5,6 +5,7 @@ import LingoLexer
 public class Parser {
     private let tokens: [Token]
     private var currentIndex: Int = 0
+    public var skippedTokens: [Token] = []
     
     public init(tokens: [Token]) {
         self.tokens = tokens
@@ -226,12 +227,16 @@ public class Parser {
         
         // Otherwise, probably an assignment (x = y) or expression (foo())
         if let expr = parseExpression() {
+            // Lingo allows trailing newlines to be skipped or included in some cases,
+            // but if parseExpression succeeds and the next token is a newline, we should consume it?
+            // Actually, parseScript loop handles newlines.
+            
             if case .binaryOperation(let left, let op, let right) = expr, op == .equals {
                 return .assignment(target: left, value: right)
             }
             return .expressionStatement(expr)
         }
-        
+        skippedTokens.append(peek())
         _ = advance() // skip unrecognized
         return nil
     }
@@ -468,92 +473,122 @@ public class Parser {
     }
     
     private func parsePrimary() -> Expression? {
+        var baseExpr: Expression? = nil
+        
         if match(.minus) {
             if let expr = parsePrimary() {
-                return .unaryOperation(operator: .negate, operand: expr)
+                baseExpr = .unaryOperation(operator: .negate, operand: expr)
             }
         } else if matchKeyword("not") {
             if let expr = parsePrimary() {
-                return .unaryOperation(operator: .not, operand: expr)
+                baseExpr = .unaryOperation(operator: .not, operand: expr)
             }
         } else if matchKeyword("the") {
             if matchKeyword("last") {
                 if matchKeyword("char") {
                     _ = matchKeyword("of")
-                    if let target = parsePrimary() { return .lastStringChunk(type: .char, obj: target) }
+                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .char, obj: target) }
                 } else if matchKeyword("word") {
                     _ = matchKeyword("of")
-                    if let target = parsePrimary() { return .lastStringChunk(type: .word, obj: target) }
+                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .word, obj: target) }
                 } else if matchKeyword("item") {
                     _ = matchKeyword("of")
-                    if let target = parsePrimary() { return .lastStringChunk(type: .item, obj: target) }
+                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .item, obj: target) }
                 } else if matchKeyword("line") {
                     _ = matchKeyword("of")
-                    if let target = parsePrimary() { return .lastStringChunk(type: .line, obj: target) }
+                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .line, obj: target) }
                 }
             } else if matchKeyword("number") {
                 if matchKeyword("of") {
                     if matchKeyword("chars") {
                         _ = matchKeyword("in")
-                        if let target = parsePrimary() { return .stringChunkCount(type: .char, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .stringChunkCount(type: .char, obj: target) }
                     } else if matchKeyword("words") {
                         _ = matchKeyword("in")
-                        if let target = parsePrimary() { return .stringChunkCount(type: .word, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .stringChunkCount(type: .word, obj: target) }
                     } else if matchKeyword("items") {
                         _ = matchKeyword("in")
-                        if let target = parsePrimary() { return .stringChunkCount(type: .item, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .stringChunkCount(type: .item, obj: target) }
                     } else if matchKeyword("lines") {
                         _ = matchKeyword("in")
-                        if let target = parsePrimary() { return .stringChunkCount(type: .line, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .stringChunkCount(type: .line, obj: target) }
                     }
                 }
             }
+            
+            if baseExpr == nil {
             
             if case .identifier(let prop) = advance() {
                 if matchKeyword("of") {
                     if matchKeyword("menu") {
                         if let menuId = parsePrimary() {
-                            return .menuProp(menuId: menuId, prop: prop)
+                            baseExpr = .menuProp(menuId: menuId, prop: prop)
                         }
                     } else if matchKeyword("menuItem") {
                         if let itemId = parsePrimary() {
                             _ = matchKeyword("of")
                             _ = matchKeyword("menu")
                             if let menuId = parsePrimary() {
-                                return .menuItemProp(menuId: menuId, itemId: itemId, prop: prop)
+                                baseExpr = .menuItemProp(menuId: menuId, itemId: itemId, prop: prop)
                             }
                         }
                     } else if matchKeyword("sound") {
                         if let soundId = parsePrimary() {
-                            return .soundProp(soundId: soundId, prop: prop)
+                            baseExpr = .soundProp(soundId: soundId, prop: prop)
                         }
                     } else if matchKeyword("sprite") {
                         if let spriteId = parsePrimary() {
-                            return .spriteProp(spriteId: spriteId, prop: prop)
+                            baseExpr = .spriteProp(spriteId: spriteId, prop: prop)
                         }
                     } else if let target = parsePrimary() {
-                        return .theProp(obj: target, prop: prop)
+                        baseExpr = .theProp(obj: target, prop: prop)
                     }
                 }
-                return .the(prop)
+                if baseExpr == nil {
+                    baseExpr = .the(prop)
+                }
+            }
             }
         } else if matchKeyword("sprite") {
             if let spriteId = parsePrimary() {
                 if matchKeyword("intersects") {
-                    if let target = parsePrimary() { return .spriteIntersects(first: spriteId, second: target) }
+                    if let target = parsePrimary() { baseExpr = .spriteIntersects(first: spriteId, second: target) }
                 } else if matchKeyword("within") {
-                    if let target = parsePrimary() { return .spriteWithin(first: spriteId, second: target) }
+                    if let target = parsePrimary() { baseExpr = .spriteWithin(first: spriteId, second: target) }
                 }
-                return .member(type: "sprite", id: spriteId, castId: nil)
+                if baseExpr == nil {
+                    baseExpr = .member(type: "sprite", id: spriteId, castId: nil)
+                }
+            }
+        } else if matchKeyword("member") {
+            if match(.leftParen) {
+                if let memberId = parseExpression() {
+                    var castId: Expression? = nil
+                    if match(.comma) {
+                        castId = parseExpression()
+                    }
+                    _ = match(.rightParen)
+                    baseExpr = .member(type: "member", id: memberId, castId: castId)
+                }
+            } else {
+                if let memberId = parsePrimary() {
+                    var castId: Expression? = nil
+                    if matchKeyword("of") {
+                        if matchKeyword("castLib") {
+                            castId = parsePrimary()
+                        }
+                    }
+                    baseExpr = .member(type: "member", id: memberId, castId: castId)
+                }
             }
         } else if matchKeyword("char") {
-             return parseChunk(.char)
+             baseExpr = parseChunk(.char)
         } else if matchKeyword("word") {
-             return parseChunk(.word)
+             baseExpr = parseChunk(.word)
         } else if matchKeyword("item") {
-             return parseChunk(.item)
+             baseExpr = parseChunk(.item)
         } else if matchKeyword("line") {
-             return parseChunk(.line)
+             baseExpr = parseChunk(.line)
         } else if match(.leftBracket) {
             // List or property list
             if match(.colon) {
@@ -584,43 +619,42 @@ public class Parser {
             
             _ = match(.rightBracket)
             
-            if isPropList { return .propertyList(props) }
-            return .list(items)
+            
+            if isPropList { baseExpr = .propertyList(props) }
+            else { baseExpr = .list(items) }
         } else if match(.leftParen) {
             let expr = parseExpression()
             _ = match(.rightParen)
-            return expr
-        }
-        
-        let token = advance()
-        var baseExpr: Expression? = nil
-        
-        switch token {
-        case .integer(let i): baseExpr = .integer(i)
-        case .number(let d): baseExpr = .float(d)
-        case .string(let s): baseExpr = .string(s)
-        case .symbol(let s): baseExpr = .symbol(s)
-        case .identifier(let id):
-            // Check if function call
-            if match(.leftParen) {
-                var args: [Expression] = []
-                if !check(.rightParen) {
-                    repeat {
-                        if let arg = parseExpression() {
-                            args.append(arg)
-                        }
-                    } while match(.comma)
+            baseExpr = expr
+        } else {
+            let token = advance()
+            switch token {
+            case .integer(let i): baseExpr = .integer(i)
+            case .number(let d): baseExpr = .float(d)
+            case .string(let s): baseExpr = .string(s)
+            case .symbol(let s): baseExpr = .symbol(s)
+            case .identifier(let id):
+                // Check if function call
+                if match(.leftParen) {
+                    var args: [Expression] = []
+                    if !check(.rightParen) {
+                        repeat {
+                            if let arg = parseExpression() {
+                                args.append(arg)
+                            }
+                        } while match(.comma)
+                    }
+                    _ = match(.rightParen)
+                    baseExpr = .functionCall(target: nil, name: id, arguments: args)
+                } else {
+                    let lower = id.lowercased()
+                    if lower == "true" { baseExpr = .boolean(true) }
+                    else if lower == "false" { baseExpr = .boolean(false) }
+                    else if lower == "empty" { baseExpr = .string("") }
+                    else { baseExpr = .identifier(id) }
                 }
-                _ = match(.rightParen)
-                baseExpr = .functionCall(target: nil, name: id, arguments: args)
-            } else {
-                let lower = id.lowercased()
-                if lower == "true" { baseExpr = .boolean(true) }
-                else if lower == "false" { baseExpr = .boolean(false) }
-                else if lower == "empty" { baseExpr = .string("") }
-                else { baseExpr = .identifier(id) }
+            default: return nil
             }
-        default: return nil
         }
         
         // Handle dot access, bracket access, and method calls
