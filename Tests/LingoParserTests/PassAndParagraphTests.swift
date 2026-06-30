@@ -14,11 +14,12 @@ struct PassAndParagraphTests {
 
     @Test
     func parsesPassStatement() {
-        let (script, skipped) = parse("""
-        on keyDown me
-            pass
-        end
-        """)
+        let (script, skipped) = parse(
+            """
+            on keyDown me
+                pass
+            end
+            """)
         #expect(skipped.isEmpty)
         guard case .handler(_, _, let body) = script.statements.first else {
             Issue.record("Expected handler")
@@ -29,14 +30,16 @@ struct PassAndParagraphTests {
 
     @Test
     func parsesParagraphChunk() {
-        let (script, skipped) = parse("""
-        on test me
-            put paragraph 2 of myText into p
-        end
-        """)
+        let (script, skipped) = parse(
+            """
+            on test me
+                put paragraph 2 of myText into p
+            end
+            """)
         #expect(skipped.isEmpty)
         guard case .handler(_, _, let body) = script.statements.first,
-              case .put(_, let value, _) = body.first else {
+            case .put(_, let value, _) = body.first
+        else {
             Issue.record("Expected put statement")
             return
         }
@@ -49,15 +52,17 @@ struct PassAndParagraphTests {
 
     @Test
     func parsesParagraphCount() {
-        let (script, skipped) = parse("""
-        on test me
-            put the number of paragraphs in myText into n
-        end
-        """)
+        let (script, skipped) = parse(
+            """
+            on test me
+                put the number of paragraphs in myText into n
+            end
+            """)
         #expect(skipped.isEmpty)
         guard case .handler(_, _, let body) = script.statements.first,
-              case .put(_, let value, _) = body.first,
-              case .stringChunkCount(let type, _) = value else {
+            case .put(_, let value, _) = body.first,
+            case .stringChunkCount(let type, _) = value
+        else {
             Issue.record("Expected paragraph count expression")
             return
         }
@@ -66,12 +71,13 @@ struct PassAndParagraphTests {
 
     @Test
     func roundTripsPassAndParagraph() {
-        let (script, _) = parse("""
-        on test me
-            pass
-            put paragraph 1 of myText into p
-        end
-        """)
+        let (script, _) = parse(
+            """
+            on test me
+                pass
+                put paragraph 1 of myText into p
+            end
+            """)
         let source = script.toLingoSource()
         #expect(source.contains("pass"))
         #expect(source.contains("paragraph 1"))

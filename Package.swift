@@ -9,10 +9,10 @@ let package = Package(
         .library(name: "LingoTranspiler", targets: ["LingoTranspiler"]),
         .library(name: "LingoRuntime", targets: ["LingoRuntime"]),
         .library(name: "LingoAST", targets: ["LingoAST"]),
-        .library(name: "LingoParser", targets: ["LingoParser"]),
+        .library(name: "LingoParser", targets: ["LingoParser"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0")
     ],
     targets: [
         // AST
@@ -64,6 +64,6 @@ let package = Package(
             name: "LingoRuntimeTests",
             dependencies: ["LingoRuntime"],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
-        ),
+        )
     ]
 )

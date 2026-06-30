@@ -3,8 +3,8 @@ public enum Token: Equatable {
     case number(Double)
     case integer(Int)
     case string(String)
-    case symbol(String) // e.g. #PREGAME
-    
+    case symbol(String)  // e.g. #PREGAME
+
     // Punctuation
     case leftParen
     case rightParen
@@ -13,8 +13,8 @@ public enum Token: Equatable {
     case colon
     case comma
     case dot
-    case range // ..
-    
+    case range  // ..
+
     // Operators
     case plus
     case minus
@@ -26,9 +26,9 @@ public enum Token: Equatable {
     case lessThanOrEqual
     case greaterThanOrEqual
     case notEquals
-    case concat       // &
+    case concat  // &
     case concatSpace  // &&
-    
+
     // Control
     case newline
     case eof

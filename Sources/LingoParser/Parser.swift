@@ -1,4 +1,3 @@
-
 import LingoAST
 
 public class Parser {
@@ -6,33 +5,33 @@ public class Parser {
     private var currentIndex: Int = 0
     public var skippedTokens: [Token] = []
     public var log: ((String) -> Void)?
-    
+
     public init(tokens: [Token]) {
         self.tokens = tokens
     }
-    
+
     private var isAtEnd: Bool {
         return peek() == .eof
     }
-    
+
     private func peek() -> Token {
         if currentIndex < tokens.count {
             return tokens[currentIndex]
         }
         return .eof
     }
-    
+
     private func advance() -> Token {
         if !isAtEnd {
             currentIndex += 1
         }
         return previous()
     }
-    
+
     private func previous() -> Token {
         return tokens[currentIndex - 1]
     }
-    
+
     private func match(_ types: Token...) -> Bool {
         for type in types {
             if check(type) {
@@ -42,12 +41,12 @@ public class Parser {
         }
         return false
     }
-    
+
     private func check(_ type: Token) -> Bool {
         if isAtEnd { return false }
         return peek() == type
     }
-    
+
     // Case-insensitive check for identifier (which acts as keywords in our Lexer)
     private func matchKeyword(_ word: String) -> Bool {
         if isAtEnd { return false }
@@ -57,17 +56,17 @@ public class Parser {
         }
         return false
     }
-    
+
     private func skipNewlines() {
         while check(.newline) {
             _ = advance()
         }
     }
-    
+
     public func parseScript() -> Script {
         log?("Starting parseScript")
         var statements: [Statement] = []
-        
+
         skipNewlines()
         while !isAtEnd {
             if let stmt = parseTopLevel() {
@@ -75,11 +74,11 @@ public class Parser {
             }
             skipNewlines()
         }
-        
+
         log?("Finished parseScript. Statements count: \(statements.count)")
         return Script(statements: statements)
     }
-    
+
     private func parseTopLevel() -> Statement? {
         log?("parseTopLevel at index \(currentIndex) (\(peek()))")
         if matchKeyword("on") {
@@ -101,28 +100,28 @@ public class Parser {
             } while match(.comma)
             return .global(names: names)
         } else {
-            if matchKeyword("end") { return nil } // Ignore stray ends
+            if matchKeyword("end") { return nil }  // Ignore stray ends
             // Might be a top-level statement or error
             log?("parseTopLevel falling back to parseStatement")
             return parseStatement()
         }
     }
-    
+
     private func parseHandler() -> Statement? {
         // 'on' already matched
         guard case .identifier(let name) = advance() else { return nil }
-        
+
         var arguments: [String] = []
         // arguments can be separated by spaces or commas
         while !check(.newline) && !isAtEnd {
-            _ = match(.comma) // optional comma
+            _ = match(.comma)  // optional comma
             if case .identifier(let argName) = advance() {
                 arguments.append(argName)
             } else {
                 break
             }
         }
-        
+
         var body: [Statement] = []
         while !isAtEnd {
             skipNewlines()
@@ -130,7 +129,7 @@ public class Parser {
                 // optionally could have 'end handlerName' or 'end if' etc. but here we just match 'end'
                 if case .identifier(let endName) = peek() {
                     if endName.lowercased() == name.lowercased() {
-                        _ = advance() // consume optional name
+                        _ = advance()  // consume optional name
                     }
                 }
                 break
@@ -139,10 +138,10 @@ public class Parser {
                 body.append(stmt)
             }
         }
-        
+
         return .handler(name: name, arguments: arguments, body: body)
     }
-    
+
     private func parseStatement() -> Statement? {
         log?("parseStatement at index \(currentIndex) (\(peek()))")
         if matchKeyword("if") {
@@ -168,11 +167,11 @@ public class Parser {
         } else if matchKeyword("set") {
             // set x = y OR set x to y
             guard let target = parseExpression() else { return nil }
-            
+
             if case .binaryOperation(let left, let op, let right) = target, op == .equals {
                 return .assignment(target: left, value: right)
             }
-            
+
             if match(.equals) || matchKeyword("to") {
                 if let value = parseExpression() {
                     return .assignment(target: target, value: value)
@@ -195,12 +194,12 @@ public class Parser {
             }
             return .put(type: .display, value: value, target: nil)
         } else if matchKeyword("delete") {
-             // simplified delete support
-             guard let target = parseExpression() else { return nil }
-             return .chunkDelete(chunk: target) 
+            // simplified delete support
+            guard let target = parseExpression() else { return nil }
+            return .chunkDelete(chunk: target)
         } else if matchKeyword("hilite") {
-             guard let target = parseExpression() else { return nil }
-             return .chunkHilite(chunk: target)
+            guard let target = parseExpression() else { return nil }
+            return .chunkHilite(chunk: target)
         } else if matchKeyword("tell") {
             guard let window = parseExpression() else { return nil }
             var body: [Statement] = []
@@ -233,13 +232,13 @@ public class Parser {
                 }
             }
         }
-        
+
         // Otherwise, probably an assignment (x = y) or expression (foo())
         if let expr = parseExpression() {
             // Lingo allows trailing newlines to be skipped or included in some cases,
             // but if parseExpression succeeds and the next token is a newline, we should consume it?
             // Actually, parseScript loop handles newlines.
-            
+
             if case .binaryOperation(let left, let op, let right) = expr, op == .equals {
                 return .assignment(target: left, value: right)
             }
@@ -254,30 +253,30 @@ public class Parser {
             }
         }
         skippedTokens.append(peek())
-        _ = advance() // skip unrecognized
+        _ = advance()  // skip unrecognized
         return nil
     }
-    
+
     private func parseIf() -> Statement? {
         log?("parseIf at index \(currentIndex)")
         guard let condition = parseExpression() else { return nil }
-        _ = matchKeyword("then") // optional 'then'
-        
+        _ = matchKeyword("then")  // optional 'then'
+
         var body: [Statement] = []
         var elseBody: [Statement]? = nil
-        
+
         // Single line if
         if !check(.newline) && !isAtEnd && !matchKeyword("end") && !matchKeyword("else") {
-             if let stmt = parseStatement() {
-                 body.append(stmt)
-             }
-             return .ifStatement(condition: condition, body: body, elseBody: elseBody)
+            if let stmt = parseStatement() {
+                body.append(stmt)
+            }
+            return .ifStatement(condition: condition, body: body, elseBody: elseBody)
         }
 
         while !isAtEnd {
             skipNewlines()
             if matchKeyword("end") {
-                _ = matchKeyword("if") // optional 'if'
+                _ = matchKeyword("if")  // optional 'if'
                 break
             } else if matchKeyword("else") {
                 skipNewlines()
@@ -294,19 +293,19 @@ public class Parser {
                 }
                 break
             }
-            
+
             if let stmt = parseStatement() {
                 body.append(stmt)
             }
         }
-        
+
         return .ifStatement(condition: condition, body: body, elseBody: elseBody)
     }
-    
+
     private func parseRepeat() -> Statement? {
         if matchKeyword("with") {
             guard case .identifier(let varName) = advance() else { return nil }
-            
+
             if matchKeyword("in") {
                 // repeat with x in list
                 guard let listExpr = parseExpression() else { return nil }
@@ -325,11 +324,11 @@ public class Parser {
             } else {
                 _ = match(.equals)
                 guard let startExpr = parseExpression() else { return nil }
-                
+
                 if matchKeyword("to") || matchKeyword("down") {
-                    _ = matchKeyword("to") // handles 'down to'
+                    _ = matchKeyword("to")  // handles 'down to'
                     guard let endExpr = parseExpression() else { return nil }
-                    
+
                     var body: [Statement] = []
                     while !isAtEnd {
                         skipNewlines()
@@ -361,15 +360,15 @@ public class Parser {
         }
         return nil
     }
-    
+
     private func parseCase() -> Statement? {
         log?("parseCase at index \(currentIndex)")
         guard let condition = parseExpression() else { return nil }
         _ = matchKeyword("of")
-        
+
         var cases: [CaseBlock] = []
         var otherwise: [Statement]? = nil
-        
+
         while !isAtEnd {
             skipNewlines()
             if matchKeyword("end") {
@@ -398,46 +397,53 @@ public class Parser {
                     if let expr = parseExpression() {
                         values.append(expr)
                         if match(.comma) { continue }
-                    } else { break }
-                    
+                    } else {
+                        break
+                    }
+
                     if matchKeyword("to") {
                         if let expr2 = parseExpression() {
                             // range not fully supported in AST values yet
                         }
-                    } else { break }
+                    } else {
+                        break
+                    }
                 }
-                
+
                 if values.isEmpty {
                     log?("parseCase values empty, breaking")
-                    break 
+                    break
                 }
                 _ = match(.colon)
-                
+
                 var body: [Statement] = []
                 while !isAtEnd {
                     skipNewlines()
-                    
+
                     let peek1 = peek()
                     if case .identifier(let id) = peek1 {
                         let lower = id.lowercased()
                         if lower == "end" || lower == "otherwise" { break }
                     }
-                    
+
                     // Lookahead to see if this is a new case (ends with colon before newline)
                     var isNewCase = false
                     var tempIdx = currentIndex
                     while tempIdx < tokens.count {
                         let t = tokens[tempIdx]
-                        if t == .colon { isNewCase = true; break }
+                        if t == .colon {
+                            isNewCase = true
+                            break
+                        }
                         if t == .newline || t == .eof { break }
                         if case .identifier(let id) = t, id.lowercased() == "end" { break }
                         tempIdx += 1
                     }
-                    if isNewCase { 
+                    if isNewCase {
                         log?("parseCase inner loop break because isNewCase=true at index \(currentIndex) (\(peek()))")
-                        break 
+                        break
                     }
-                    
+
                     if let stmt = parseStatement() {
                         body.append(stmt)
                     } else {
@@ -447,39 +453,39 @@ public class Parser {
                 }
                 cases.append(CaseBlock(values: values, body: body))
             }
-         }
-         return .caseStatement(condition: condition, cases: cases, otherwise: otherwise)
+        }
+        return .caseStatement(condition: condition, cases: cases, otherwise: otherwise)
     }
 
     // Simplified Pratt parser for expressions
     private func parseExpression() -> Expression? {
         return parseBinaryExpression(precedence: 0)
     }
-    
+
     private func parseBinaryExpression(precedence: Int) -> Expression? {
         var left = parsePrimary()
         guard left != nil else { return nil }
-        
+
         while !isAtEnd {
             let opToken = peek()
             let opPrecedence = getPrecedence(opToken)
             if opPrecedence == 0 || opPrecedence < precedence {
                 break
             }
-            
-            _ = advance() // consume operator
+
+            _ = advance()  // consume operator
             let op = getBinaryOperator(opToken)!
-            
+
             if let right = parseBinaryExpression(precedence: opPrecedence) {
                 left = .binaryOperation(left: left!, operator: op, right: right)
             } else {
                 break
             }
         }
-        
+
         return left
     }
-    
+
     private func getPrecedence(_ token: Token) -> Int {
         switch token {
         case .equals, .notEquals, .lessThan, .greaterThan, .lessThanOrEqual, .greaterThanOrEqual:
@@ -500,7 +506,7 @@ public class Parser {
             return 0
         }
     }
-    
+
     private func getBinaryOperator(_ token: Token) -> BinaryOperator? {
         switch token {
         case .equals: return .equals
@@ -526,10 +532,10 @@ public class Parser {
         default: return nil
         }
     }
-    
+
     private func parsePrimary() -> Expression? {
         var baseExpr: Expression? = nil
-        
+
         if match(.minus) {
             if let expr = parsePrimary() {
                 baseExpr = .unaryOperation(operator: .negate, operand: expr)
@@ -581,39 +587,39 @@ public class Parser {
                     }
                 }
             }
-            
+
             if baseExpr == nil {
-            
-            if case .identifier(let prop) = advance() {
-                if matchKeyword("of") {
-                    if matchKeyword("menu") {
-                        if let menuId = parsePrimary() {
-                            baseExpr = .menuProp(menuId: menuId, prop: prop)
-                        }
-                    } else if matchKeyword("menuItem") {
-                        if let itemId = parsePrimary() {
-                            _ = matchKeyword("of")
-                            _ = matchKeyword("menu")
+
+                if case .identifier(let prop) = advance() {
+                    if matchKeyword("of") {
+                        if matchKeyword("menu") {
                             if let menuId = parsePrimary() {
-                                baseExpr = .menuItemProp(menuId: menuId, itemId: itemId, prop: prop)
+                                baseExpr = .menuProp(menuId: menuId, prop: prop)
                             }
+                        } else if matchKeyword("menuItem") {
+                            if let itemId = parsePrimary() {
+                                _ = matchKeyword("of")
+                                _ = matchKeyword("menu")
+                                if let menuId = parsePrimary() {
+                                    baseExpr = .menuItemProp(menuId: menuId, itemId: itemId, prop: prop)
+                                }
+                            }
+                        } else if matchKeyword("sound") {
+                            if let soundId = parsePrimary() {
+                                baseExpr = .soundProp(soundId: soundId, prop: prop)
+                            }
+                        } else if matchKeyword("sprite") {
+                            if let spriteId = parsePrimary() {
+                                baseExpr = .spriteProp(spriteId: spriteId, prop: prop)
+                            }
+                        } else if let target = parsePrimary() {
+                            baseExpr = .theProp(obj: target, prop: prop)
                         }
-                    } else if matchKeyword("sound") {
-                        if let soundId = parsePrimary() {
-                            baseExpr = .soundProp(soundId: soundId, prop: prop)
-                        }
-                    } else if matchKeyword("sprite") {
-                        if let spriteId = parsePrimary() {
-                            baseExpr = .spriteProp(spriteId: spriteId, prop: prop)
-                        }
-                    } else if let target = parsePrimary() {
-                        baseExpr = .theProp(obj: target, prop: prop)
+                    }
+                    if baseExpr == nil {
+                        baseExpr = .the(prop)
                     }
                 }
-                if baseExpr == nil {
-                    baseExpr = .the(prop)
-                }
-            }
             }
         } else if matchKeyword("sprite") {
             var spriteId: Expression?
@@ -659,15 +665,15 @@ public class Parser {
                 }
             }
         } else if matchKeyword("char") {
-             baseExpr = parseChunk(.char)
+            baseExpr = parseChunk(.char)
         } else if matchKeyword("word") {
-             baseExpr = parseChunk(.word)
+            baseExpr = parseChunk(.word)
         } else if matchKeyword("item") {
-             baseExpr = parseChunk(.item)
+            baseExpr = parseChunk(.item)
         } else if matchKeyword("line") {
-             baseExpr = parseChunk(.line)
+            baseExpr = parseChunk(.line)
         } else if matchKeyword("paragraph") {
-             baseExpr = parseChunk(.paragraph)
+            baseExpr = parseChunk(.paragraph)
         } else if match(.leftBracket) {
             // List or property list
             if match(.colon) {
@@ -675,15 +681,15 @@ public class Parser {
                 _ = match(.rightBracket)
                 return .propertyList([])
             }
-            
+
             var items: [Expression] = []
             var isPropList = false
             var props: [PropertyListEntry] = []
-            
+
             if match(.rightBracket) {
-                return .list([]) // empty list
+                return .list([])  // empty list
             }
-            
+
             repeat {
                 guard let expr = parseExpression() else { break }
                 if match(.colon) {
@@ -695,12 +701,10 @@ public class Parser {
                     items.append(expr)
                 }
             } while match(.comma)
-            
+
             _ = match(.rightBracket)
-            
-            
-            if isPropList { baseExpr = .propertyList(props) }
-            else { baseExpr = .list(items) }
+
+            if isPropList { baseExpr = .propertyList(props) } else { baseExpr = .list(items) }
         } else if match(.leftParen) {
             let expr = parseExpression()
             _ = match(.rightParen)
@@ -708,10 +712,18 @@ public class Parser {
         } else {
             let token = peek()
             switch token {
-            case .integer(let i): _ = advance(); baseExpr = .integer(i)
-            case .number(let d): _ = advance(); baseExpr = .float(d)
-            case .string(let s): _ = advance(); baseExpr = .string(s)
-            case .symbol(let s): _ = advance(); baseExpr = .symbol(s)
+            case .integer(let i):
+                _ = advance()
+                baseExpr = .integer(i)
+            case .number(let d):
+                _ = advance()
+                baseExpr = .float(d)
+            case .string(let s):
+                _ = advance()
+                baseExpr = .string(s)
+            case .symbol(let s):
+                _ = advance()
+                baseExpr = .symbol(s)
             case .identifier(let id):
                 _ = advance()
                 // Check if function call
@@ -728,15 +740,20 @@ public class Parser {
                     baseExpr = .functionCall(target: nil, name: id, arguments: args)
                 } else {
                     let lower = id.lowercased()
-                    if lower == "true" { baseExpr = .boolean(true) }
-                    else if lower == "false" { baseExpr = .boolean(false) }
-                    else if lower == "empty" { baseExpr = .string("") }
-                    else { baseExpr = .identifier(id) }
+                    if lower == "true" {
+                        baseExpr = .boolean(true)
+                    } else if lower == "false" {
+                        baseExpr = .boolean(false)
+                    } else if lower == "empty" {
+                        baseExpr = .string("")
+                    } else {
+                        baseExpr = .identifier(id)
+                    }
                 }
             default: return nil
             }
         }
-        
+
         // Handle dot access, bracket access, and method calls
         while true {
             if match(.dot) {
@@ -772,20 +789,20 @@ public class Parser {
                 break
             }
         }
-        
+
         return baseExpr
     }
-    
+
     private func parseChunk(_ type: ChunkType) -> Expression? {
-         // e.g. word 1 of Entry
-         // char -30000 of record (negative index)
-         guard let index = parseExpression() else { return nil }
-         var last: Expression? = nil
-         if matchKeyword("to") {
-             last = parseExpression()
-         }
-         if matchKeyword("of") || matchKeyword("in") { }
-         guard let target = parsePrimary() else { return nil }
-         return .chunkExpression(type: type, first: index, last: last, string: target)
+        // e.g. word 1 of Entry
+        // char -30000 of record (negative index)
+        guard let index = parseExpression() else { return nil }
+        var last: Expression? = nil
+        if matchKeyword("to") {
+            last = parseExpression()
+        }
+        if matchKeyword("of") || matchKeyword("in") {}
+        guard let target = parsePrimary() else { return nil }
+        return .chunkExpression(type: type, first: index, last: last, string: target)
     }
 }

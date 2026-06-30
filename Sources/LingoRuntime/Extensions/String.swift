@@ -2,8 +2,8 @@
 // LingoRuntime module - Embedded Swift compatible
 
 /// Custom case-insensitive string operations to avoid Foundation dependency and Embedded Swift Unicode Data Tables
-fileprivate func _asciiLowercased(_ byte: UInt8) -> UInt8 {
-    if byte >= 65 && byte <= 90 { // 'A' ... 'Z'
+private func _asciiLowercased(_ byte: UInt8) -> UInt8 {
+    if byte >= 65 && byte <= 90 {  // 'A' ... 'Z'
         return byte + 32
     }
     return byte
@@ -17,7 +17,7 @@ extension String {
         }
         return String(decoding: bytes, as: UTF8.self)
     }
-    
+
     public func caseInsensitiveEquals(_ other: String) -> Bool {
         let lUTF8 = self.utf8
         let rUTF8 = other.utf8
@@ -36,7 +36,7 @@ extension String {
         var lIter = self.utf8.makeIterator()
         var rIter = other.utf8.makeIterator()
         while let lByte = lIter.next() {
-            guard let rByte = rIter.next() else { return false } // r is shorter
+            guard let rByte = rIter.next() else { return false }  // r is shorter
             let lLower = _asciiLowercased(lByte)
             let rLower = _asciiLowercased(rByte)
             if lLower != rLower {
@@ -55,7 +55,7 @@ extension String {
         for i in 0...(sBytes.count - subBytes.count) {
             var match = true
             for j in 0..<subBytes.count {
-                if _asciiLowercased(sBytes[i+j]) != _asciiLowercased(subBytes[j]) {
+                if _asciiLowercased(sBytes[i + j]) != _asciiLowercased(subBytes[j]) {
                     match = false
                     break
                 }

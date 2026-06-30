@@ -3,38 +3,38 @@ import LingoAST
 import LingoParser
 
 public final class LingoTranspiler {
-    
+
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
     private var script: Script
     private var relativePath: String
     private var originalPath: String
-    
+
     public init(script: Script, relativePath: String, originalPath: String) {
         self.script = script
         self.relativePath = relativePath
         self.originalPath = originalPath
     }
-    
+
     public func transpile() -> String {
         let pathComponents = originalPath.split(separator: "/")
         let shortPath = pathComponents.count >= 2 ? pathComponents.suffix(2).joined(separator: "/") : originalPath
         var output = "// Transpiled from \(shortPath)\n"
         output += "import LingoRuntime\n\n"
-        
+
         let isMovie = relativePath.lowercased().contains("movie_")
-        
+
         if !isMovie {
             let className = formatClassName(relativePath)
             output += "public class \(className): LingoObject {\n"
-            
+
             var properties: [String] = []
             for stmt in script.statements {
                 if case .property(let names) = stmt {
                     properties.append(contentsOf: names)
                 }
             }
-            
+
             // Emit CodingKeys enum if there are properties
             if !properties.isEmpty {
                 output += "    /// Property keys for type-safe property access.\n"
@@ -54,12 +54,12 @@ public final class LingoTranspiler {
                 output += "        }\n"
                 output += "    }\n\n"
             }
-            
+
             for prop in properties {
                 output += "    public var `\(prop)`: LingoValue = .void\n"
             }
             if !properties.isEmpty { output += "\n" }
-            
+
             output += "    public override func getProperty(_ name: String) -> LingoValue {\n"
             if !properties.isEmpty {
                 output += "        guard let key = CodingKeys.find(name) else {\n"
@@ -74,7 +74,7 @@ public final class LingoTranspiler {
                 output += "        return super.getProperty(name)\n"
             }
             output += "    }\n\n"
-            
+
             output += "    public override func setProperty(_ name: String, value: LingoValue) {\n"
             if !properties.isEmpty {
                 output += "        guard let key = CodingKeys.find(name) else {\n"
@@ -90,7 +90,7 @@ public final class LingoTranspiler {
                 output += "        super.setProperty(name, value: value)\n"
             }
             output += "    }\n\n"
-            
+
             let handlers = script.statements.compactMap { stmt -> (name: String, arguments: [String], body: [Statement])? in
                 if case .handler(let name, let arguments, let body) = stmt {
                     return (name, arguments, body)
@@ -98,14 +98,14 @@ public final class LingoTranspiler {
                 return nil
             }
             output += transpileCallMethod(handlers: handlers)
-            
+
             let propertyNames = Set(properties.map { $0.lowercased() })
             for stmt in script.statements {
                 if case .handler(let name, let arguments, let body) = stmt {
                     output += transpileHandler(name: name, args: arguments, body: body, isMethod: true, properties: propertyNames)
                 }
             }
-            
+
             output += "}\n"
         } else {
             for stmt in script.statements {
@@ -114,10 +114,10 @@ public final class LingoTranspiler {
                 }
             }
         }
-        
+
         return output
     }
-    
+
     private func transpileCallMethod(handlers: [(name: String, arguments: [String], body: [Statement])]) -> String {
         var output = "    public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {\n"
         output += "        switch name.asciiLowercased() {\n"
@@ -131,7 +131,7 @@ public final class LingoTranspiler {
         output += "    }\n\n"
         return output
     }
-    
+
     private func transpileHandler(name: String, args: [String], body: [Statement], isMethod: Bool, properties: Set<String>) -> String {
         let previousProperties = activeProperties
         let previousHandlerIsInitializer = activeHandlerIsInitializer
@@ -149,27 +149,27 @@ public final class LingoTranspiler {
             let funcName = isMethod ? "`\(name)`" : "lingo_\(name)"
             output += "\(functionIndent)public func \(funcName)(\(swiftArgs)) -> LingoValue {\n"
         }
-        
+
         let indent = isMethod ? "        " : "    "
-        
+
         var locals = Set<String>()
         var globals = Set<String>()
         collectVariables(in: body, locals: &locals, globals: &globals)
         for arg in args { locals.insert(arg.lowercased()) }
         locals.subtract(globals)
         locals.subtract(properties)
-        
+
         let argumentNames = Set(args.map { $0.lowercased() })
         let hoisted = locals.filter { !argumentNames.contains($0) }.sorted()
         for variable in hoisted {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
         }
         if !hoisted.isEmpty { output += "\n" }
-        
+
         for stmt in body {
             output += transpile(statement: stmt, indent: indent, locals: locals, isMethod: isMethod)
         }
-        
+
         if !isInitializer {
             output += "\(indent)return .void\n"
         }
@@ -179,7 +179,7 @@ public final class LingoTranspiler {
         activeHandlerIsInitializer = previousHandlerIsInitializer
         return output
     }
-    
+
     private func collectVariables(in statements: [Statement], locals: inout Set<String>, globals: inout Set<String>) {
         for stmt in statements {
             switch stmt {
@@ -212,7 +212,7 @@ public final class LingoTranspiler {
             }
         }
     }
-    
+
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
         var output = "\(indent)// \(statement.toLingoSource())\n"
         switch statement {
@@ -375,20 +375,24 @@ public final class LingoTranspiler {
         }
         return output
     }
-    
+
     private func transpileMemberSpritePropertyAssignment(target: LingoAST.Expression, value: String, locals: Set<String>, isMethod: Bool) -> String? {
         guard case .member(let type, let id, nil) = target,
-              type.lowercased() == "member" || type.lowercased() == "sprite" else { return nil }
-        
+            type.lowercased() == "member" || type.lowercased() == "sprite"
+        else { return nil }
+
         let chain = propertyChain(from: id)
         guard case .identifier(let baseName) = chain.base,
-              baseName.lowercased() == "me",
-              chain.properties.count >= 3,
-              chain.properties[0].lowercased() == "spritenum",
-              chain.properties[1].lowercased() == "member" else { return nil }
-        
+            baseName.lowercased() == "me",
+            chain.properties.count >= 3,
+            chain.properties[0].lowercased() == "spritenum",
+            chain.properties[1].lowercased() == "member"
+        else { return nil }
+
         let propertyName = chain.properties[chain.properties.count - 1]
-        var receiver = isMethod ? "self.`sprite`(LingoValue.object(self).`spriteNum`).`member`" : "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoEnvironment.shared.getGlobal(\"spriteNum\")]).`member`"
+        var receiver =
+            isMethod
+            ? "self.`sprite`(LingoValue.object(self).`spriteNum`).`member`" : "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoEnvironment.shared.getGlobal(\"spriteNum\")]).`member`"
         if chain.properties.count > 3 {
             for property in chain.properties.dropFirst(2).dropLast() {
                 receiver += ".`\(property)`"
@@ -396,7 +400,7 @@ public final class LingoTranspiler {
         }
         return "\(receiver).setProperty(\"\(escapeSwiftString(propertyName))\", value: \(value))"
     }
-    
+
     private func propertyChain(from expression: LingoAST.Expression) -> (base: LingoAST.Expression, properties: [String]) {
         switch expression {
         case .propertyAccess(let target, let property):
@@ -406,7 +410,7 @@ public final class LingoTranspiler {
             return (expression, [])
         }
     }
-    
+
     private func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
         switch expression {
         case .void: return ".void"
@@ -445,7 +449,7 @@ public final class LingoTranspiler {
                 return "\(tStr).`\(name)`(\(argStr))"
             } else {
                 if locals.contains(name.lowercased()) {
-                    return "`\(name.lowercased())`(\(argStr))" // LingoValue being called
+                    return "`\(name.lowercased())`(\(argStr))"  // LingoValue being called
                 } else {
                     return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
                 }
@@ -482,7 +486,9 @@ public final class LingoTranspiler {
             let itemsStr = items.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
             return ".list([\(itemsStr)])"
         case .propertyList(let entries):
-            let entriesStr = entries.map { "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod)))" }.joined(separator: ", ")
+            let entriesStr = entries.map {
+                "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod)))"
+            }.joined(separator: ", ")
             return ".propertyList([\(entriesStr)])"
         case .elementAccess(let target, let index):
             let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
@@ -544,13 +550,13 @@ public final class LingoTranspiler {
             return ".void /* Unsupported expression: \(expression) */"
         }
     }
-    
+
     private func formatClassName(_ relativePath: String) -> String {
         let name = relativePath.replacingOccurrences(of: ".ls", with: "")
         let components = name.split { !$0.isLetter && !$0.isNumber }
         return components.map { $0.prefix(1).uppercased() + String($0.dropFirst()).lowercased() }.joined()
     }
-    
+
     private func escapeSwiftString(_ value: String) -> String {
         value
             .replacingOccurrences(of: "\\", with: "\\\\")
