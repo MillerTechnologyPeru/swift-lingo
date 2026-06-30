@@ -1,26 +1,52 @@
 // LingoValue.swift
 // LingoRuntime module - Embedded Swift compatible
 
-/// Custom case-insensitive string operations to avoid Foundation dependency
+/// Custom case-insensitive string operations to avoid Foundation dependency and Embedded Swift Unicode Data Tables
+fileprivate func _asciiLowercased(_ byte: UInt8) -> UInt8 {
+    if byte >= 65 && byte <= 90 { // 'A' ... 'Z'
+        return byte + 32
+    }
+    return byte
+}
+
 fileprivate func _caseInsensitiveEquals(_ l: String, _ r: String) -> Bool {
-    return l.lowercased() == r.lowercased()
+    let lUTF8 = l.utf8
+    let rUTF8 = r.utf8
+    if lUTF8.count != rUTF8.count { return false }
+    var lIter = lUTF8.makeIterator()
+    var rIter = rUTF8.makeIterator()
+    while let lByte = lIter.next(), let rByte = rIter.next() {
+        if _asciiLowercased(lByte) != _asciiLowercased(rByte) {
+            return false
+        }
+    }
+    return true
 }
 
 fileprivate func _caseInsensitiveLessThan(_ l: String, _ r: String) -> Bool {
-    return l.lowercased() < r.lowercased()
+    var lIter = l.utf8.makeIterator()
+    var rIter = r.utf8.makeIterator()
+    while let lByte = lIter.next() {
+        guard let rByte = rIter.next() else { return false } // r is shorter
+        let lLower = _asciiLowercased(lByte)
+        let rLower = _asciiLowercased(rByte)
+        if lLower != rLower {
+            return lLower < rLower
+        }
+    }
+    // l is shorter or equal
+    return rIter.next() != nil
 }
 
 fileprivate func _caseInsensitiveContains(_ s: String, _ substr: String) -> Bool {
-    let lowerS = s.lowercased()
-    let lowerSub = substr.lowercased()
-    let sChars = Array(lowerS)
-    let subChars = Array(lowerSub)
-    if subChars.isEmpty { return true }
-    if subChars.count > sChars.count { return false }
-    for i in 0...(sChars.count - subChars.count) {
+    let sBytes = Array(s.utf8)
+    let subBytes = Array(substr.utf8)
+    if subBytes.isEmpty { return true }
+    if subBytes.count > sBytes.count { return false }
+    for i in 0...(sBytes.count - subBytes.count) {
         var match = true
-        for j in 0..<subChars.count {
-            if sChars[i+j] != subChars[j] {
+        for j in 0..<subBytes.count {
+            if _asciiLowercased(sBytes[i+j]) != _asciiLowercased(subBytes[j]) {
                 match = false
                 break
             }
@@ -31,13 +57,11 @@ fileprivate func _caseInsensitiveContains(_ s: String, _ substr: String) -> Bool
 }
 
 fileprivate func _caseInsensitiveStartsWith(_ s: String, _ prefix: String) -> Bool {
-    let lowerS = s.lowercased()
-    let lowerPref = prefix.lowercased()
-    let sChars = Array(lowerS)
-    let pChars = Array(lowerPref)
-    if pChars.count > sChars.count { return false }
-    for i in 0..<pChars.count {
-        if sChars[i] != pChars[i] { return false }
+    let sBytes = Array(s.utf8)
+    let pBytes = Array(prefix.utf8)
+    if pBytes.count > sBytes.count { return false }
+    for i in 0..<pBytes.count {
+        if _asciiLowercased(sBytes[i]) != _asciiLowercased(pBytes[i]) { return false }
     }
     return true
 }
