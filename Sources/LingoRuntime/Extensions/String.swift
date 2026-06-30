@@ -10,6 +10,14 @@ fileprivate func _asciiLowercased(_ byte: UInt8) -> UInt8 {
 }
 
 extension String {
+    public func asciiLowercased() -> String {
+        var bytes: [UInt8] = []
+        for byte in self.utf8 {
+            bytes.append(_asciiLowercased(byte))
+        }
+        return String(decoding: bytes, as: UTF8.self)
+    }
+    
     public func caseInsensitiveEquals(_ other: String) -> Bool {
         let lUTF8 = self.utf8
         let rUTF8 = other.utf8
