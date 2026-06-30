@@ -9,7 +9,9 @@ open class LingoObject {
     
     open func getProperty(_ name: String) -> LingoValue { return .void }
     open func setProperty(_ name: String, value: LingoValue) {}
-    open func callMethod(_ name: String, args: [LingoValue]) -> LingoValue { return .void }
+    open func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {
+        return LingoEnvironment.shared.callGlobal(name, args: args)
+    }
     
     public subscript(dynamicMember member: String) -> LingoValue {
         get {
