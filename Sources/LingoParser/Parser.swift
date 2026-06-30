@@ -457,11 +457,13 @@ public class Parser {
                 break
             }
             
-            _ = advance()
+            _ = advance() // consume operator
             let op = getBinaryOperator(opToken)!
             
             if let right = parseBinaryExpression(precedence: opPrecedence) {
                 left = .binaryOperation(left: left!, operator: op, right: right)
+            } else {
+                break
             }
         }
         
@@ -529,17 +531,21 @@ public class Parser {
         } else if matchKeyword("the") {
             if matchKeyword("last") {
                 if matchKeyword("char") {
-                    if matchKeyword("of") || matchKeyword("in") { }
+                    if matchKeyword("of") || matchKeyword("in") {
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .char, obj: target) }
+                    }
                 } else if matchKeyword("word") {
-                    if matchKeyword("of") || matchKeyword("in") { }
+                    if matchKeyword("of") || matchKeyword("in") {
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .word, obj: target) }
+                    }
                 } else if matchKeyword("item") {
-                    if matchKeyword("of") || matchKeyword("in") { }
+                    if matchKeyword("of") || matchKeyword("in") {
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .item, obj: target) }
+                    }
                 } else if matchKeyword("line") {
-                    if matchKeyword("of") || matchKeyword("in") { }
+                    if matchKeyword("of") || matchKeyword("in") {
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .line, obj: target) }
+                    }
                 }
             } else if matchKeyword("number") {
                 if matchKeyword("of") {
@@ -677,13 +683,14 @@ public class Parser {
             _ = match(.rightParen)
             baseExpr = expr
         } else {
-            let token = advance()
+            let token = peek()
             switch token {
-            case .integer(let i): baseExpr = .integer(i)
-            case .number(let d): baseExpr = .float(d)
-            case .string(let s): baseExpr = .string(s)
-            case .symbol(let s): baseExpr = .symbol(s)
+            case .integer(let i): _ = advance(); baseExpr = .integer(i)
+            case .number(let d): _ = advance(); baseExpr = .float(d)
+            case .string(let s): _ = advance(); baseExpr = .string(s)
+            case .symbol(let s): _ = advance(); baseExpr = .symbol(s)
             case .identifier(let id):
+                _ = advance()
                 // Check if function call
                 if match(.leftParen) {
                     var args: [Expression] = []
@@ -749,12 +756,13 @@ public class Parser {
     private func parseChunk(_ type: ChunkType) -> Expression? {
          // e.g. word 1 of Entry
          // char -30000 of record (negative index)
-         guard let index = parsePrimary() else { return nil }
+         guard let index = parseExpression() else { return nil }
+         var last: Expression? = nil
          if matchKeyword("to") {
-             _ = parsePrimary() // Ignoring range for now, simplify AST
+             last = parseExpression()
          }
          if matchKeyword("of") || matchKeyword("in") { }
          guard let target = parsePrimary() else { return nil }
-         return .chunkExpression(type: type, first: index, last: nil, string: target)
+         return .chunkExpression(type: type, first: index, last: last, string: target)
     }
 }
