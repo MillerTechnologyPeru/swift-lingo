@@ -2,13 +2,21 @@ import Foundation
 import LingoAST
 import LingoParser
 
-public class LingoTranspiler {
+public final class LingoTranspiler {
+    
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
+    private var script: Script
+    private var relativePath: String
+    private var originalPath: String
     
-    public init() {}
+    public init(script: Script, relativePath: String, originalPath: String) {
+        self.script = script
+        self.relativePath = relativePath
+        self.originalPath = originalPath
+    }
     
-    public func transpile(script: Script, relativePath: String, originalPath: String) -> String {
+    public func transpile() -> String {
         let pathComponents = originalPath.split(separator: "/")
         let shortPath = pathComponents.count >= 2 ? pathComponents.suffix(2).joined(separator: "/") : originalPath
         var output = "// Transpiled from \(shortPath)\n"

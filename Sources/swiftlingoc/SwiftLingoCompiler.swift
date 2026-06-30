@@ -54,7 +54,6 @@ struct SwiftLingoCompiler: ParsableCommand {
         
         for file in inputFiles {
             do {
-                let transpiler = LingoTranspiler()
                 let content = try String(contentsOf: file, encoding: .utf8)
                 var lexer = Lexer(input: content)
                 let tokens = lexer.tokenize()
@@ -72,7 +71,12 @@ struct SwiftLingoCompiler: ParsableCommand {
                     relativePath = file.lastPathComponent
                 }
                 
-                let transpiledCode = transpiler.transpile(script: script, relativePath: relativePath, originalPath: file.path)
+                let transpiler = LingoTranspiler(
+                    script: script,
+                    relativePath: relativePath,
+                    originalPath: file.path
+                )
+                let transpiledCode = transpiler.transpile()
                 
                 let disambiguatedName = relativePath.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ".ls", with: ".swift")
                 let outputFile = outputURL.appendingPathComponent(disambiguatedName)
