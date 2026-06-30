@@ -4,7 +4,7 @@ import LingoParser
 import LingoTranspiler
 
 @main
-struct SwiftLingoC: ParsableCommand {
+struct SwiftLingoCompiler: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swiftlingoc",
         abstract: "A transpiler that converts Adobe Director Lingo (.ls) scripts into Swift source code."
