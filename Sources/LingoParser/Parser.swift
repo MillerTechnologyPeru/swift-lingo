@@ -161,6 +161,8 @@ public class Parser {
             if matchKeyword("repeat") {
                 return .nextRepeat
             }
+        } else if matchKeyword("pass") {
+            return .pass
         } else if matchKeyword("case") {
             return parseCase()
         } else if matchKeyword("set") {
@@ -243,6 +245,14 @@ public class Parser {
             }
             return .expressionStatement(expr)
         }
+        print("Skipped token: \(peek()) at index \(currentIndex).")
+        log?("Skipped token: \(peek()) at index \(currentIndex)")
+        if currentIndex > 1615 && currentIndex < 1625 {
+            print("Tokens around 1620:")
+            for i in 1610..<1630 {
+                print("\(i): \(tokens[i])")
+            }
+        }
         skippedTokens.append(peek())
         _ = advance() // skip unrecognized
         return nil
@@ -313,25 +323,25 @@ public class Parser {
                 }
                 return .repeatWithIn(variable: varName, list: listExpr, body: body)
             } else {
-            _ = match(.equals)
-            guard let startExpr = parseExpression() else { return nil }
-            
-            if matchKeyword("to") || matchKeyword("down") {
-                _ = matchKeyword("to") // handles 'down to'
-                guard let endExpr = parseExpression() else { return nil }
+                _ = match(.equals)
+                guard let startExpr = parseExpression() else { return nil }
                 
-                var body: [Statement] = []
-                while !isAtEnd {
-                    skipNewlines()
-                    if matchKeyword("end") {
-                        _ = matchKeyword("repeat")
-                        break
+                if matchKeyword("to") || matchKeyword("down") {
+                    _ = matchKeyword("to") // handles 'down to'
+                    guard let endExpr = parseExpression() else { return nil }
+                    
+                    var body: [Statement] = []
+                    while !isAtEnd {
+                        skipNewlines()
+                        if matchKeyword("end") {
+                            _ = matchKeyword("repeat")
+                            break
+                        }
+                        if let stmt = parseStatement() {
+                            body.append(stmt)
+                        }
                     }
-                    if let stmt = parseStatement() {
-                        body.append(stmt)
-                    }
-                }
-                return .repeatWithCounter(variable: varName, start: startExpr, end: endExpr, body: body, up: true)
+                    return .repeatWithCounter(variable: varName, start: startExpr, end: endExpr, body: body, up: true)
                 }
             }
         } else if matchKeyword("while") {
@@ -532,19 +542,23 @@ public class Parser {
             if matchKeyword("last") {
                 if matchKeyword("char") {
                     if matchKeyword("of") || matchKeyword("in") {
-                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .char, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .char, obj: target) }
                     }
                 } else if matchKeyword("word") {
                     if matchKeyword("of") || matchKeyword("in") {
-                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .word, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .word, obj: target) }
                     }
                 } else if matchKeyword("item") {
                     if matchKeyword("of") || matchKeyword("in") {
-                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .item, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .item, obj: target) }
                     }
                 } else if matchKeyword("line") {
                     if matchKeyword("of") || matchKeyword("in") {
-                    if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .line, obj: target) }
+                        if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .line, obj: target) }
+                    }
+                } else if matchKeyword("paragraph") {
+                    if matchKeyword("of") || matchKeyword("in") {
+                        if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .paragraph, obj: target) }
                     }
                 }
             } else if matchKeyword("number") {
@@ -561,6 +575,9 @@ public class Parser {
                     } else if matchKeyword("lines") {
                         _ = matchKeyword("in")
                         if let target = parsePrimary() { baseExpr = .stringChunkCount(type: .line, obj: target) }
+                    } else if matchKeyword("paragraphs") {
+                        _ = matchKeyword("in")
+                        if let target = parsePrimary() { baseExpr = .stringChunkCount(type: .paragraph, obj: target) }
                     }
                 }
             }
@@ -645,6 +662,8 @@ public class Parser {
              baseExpr = parseChunk(.item)
         } else if matchKeyword("line") {
              baseExpr = parseChunk(.line)
+        } else if matchKeyword("paragraph") {
+             baseExpr = parseChunk(.paragraph)
         } else if match(.leftBracket) {
             // List or property list
             if match(.colon) {
