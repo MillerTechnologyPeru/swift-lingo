@@ -1,5 +1,4 @@
 import Testing
-@testable import LingoLexer
 @testable import LingoAST
 @testable import LingoParser
 

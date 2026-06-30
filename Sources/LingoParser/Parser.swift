@@ -1,6 +1,5 @@
 
 import LingoAST
-import LingoLexer
 
 public class Parser {
     private let tokens: [Token]

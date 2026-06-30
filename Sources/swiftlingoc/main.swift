@@ -1,6 +1,5 @@
 import Foundation
 import ArgumentParser
-import LingoLexer
 import LingoParser
 import LingoTranspiler
 

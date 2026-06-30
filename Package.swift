@@ -9,7 +9,6 @@ let package = Package(
         .library(name: "LingoTranspiler", targets: ["LingoTranspiler"]),
         .library(name: "LingoRuntime", targets: ["LingoRuntime"]),
         .library(name: "LingoAST", targets: ["LingoAST"]),
-        .library(name: "LingoLexer", targets: ["LingoLexer"]),
         .library(name: "LingoParser", targets: ["LingoParser"]),
     ],
     dependencies: [
@@ -21,20 +20,10 @@ let package = Package(
             name: "LingoAST",
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
-        // Lexer
-        .target(
-            name: "LingoLexer",
-            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
-        ),
-        .testTarget(
-            name: "LingoLexerTests",
-            dependencies: ["LingoLexer"],
-            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
-        ),
         // Parser
         .target(
             name: "LingoParser",
-            dependencies: ["LingoAST", "LingoLexer"],
+            dependencies: ["LingoAST"],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         .testTarget(

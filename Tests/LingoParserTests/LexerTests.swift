@@ -1,5 +1,5 @@
 import Testing
-@testable import LingoLexer
+@testable import LingoParser
 
 @Suite
 struct LexerTests {

@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 @testable import LingoParser
-@testable import LingoLexer
 
 @Suite
 struct JunkbotIntegrationTests {
