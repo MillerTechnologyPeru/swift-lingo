@@ -273,7 +273,68 @@ public enum LingoValue {
         }
     }
     
+    public static func %(lhs: LingoValue, rhs: LingoValue) -> LingoValue {
+        guard case .integer(let l) = lhs, case .integer(let r) = rhs, r != 0 else { return .void }
+        return .integer(l % r)
+    }
+    
+    public static prefix func -(value: LingoValue) -> LingoValue {
+        switch value {
+        case .integer(let v): return .integer(-v)
+        case .float(let v): return .float(-v)
+        default: return .void
+        }
+    }
+    
     // MARK: - Utilities
+    
+    public func chunk(_ type: String, start: LingoValue, end: LingoValue?) -> LingoValue {
+        guard case .string(let string) = self, let startIndex = start.asInteger() else { return .void }
+        let endIndex = end?.asInteger() ?? startIndex
+        let chunks = splitIntoChunks(string, type: type)
+        let lowerBound = Swift.max(1, startIndex)
+        let upperBound = Swift.min(chunks.count, endIndex)
+        if lowerBound > upperBound || lowerBound > chunks.count { return .string("") }
+        return .string(chunks[(lowerBound - 1)..<upperBound].joined(separator: chunkJoiner(for: type)))
+    }
+    
+    public func lastChunk(_ type: String) -> LingoValue {
+        guard case .string(let string) = self else { return .void }
+        return .string(splitIntoChunks(string, type: type).last ?? "")
+    }
+    
+    public func chunkCount(_ type: String) -> LingoValue {
+        guard case .string(let string) = self else { return .integer(0) }
+        return .integer(splitIntoChunks(string, type: type).count)
+    }
+    
+    public func asInteger() -> Int? {
+        switch self {
+        case .integer(let v): return v
+        case .float(let v): return Int(v)
+        case .string(let v): return Int(v)
+        default: return nil
+        }
+    }
+    
+    private func splitIntoChunks(_ string: String, type: String) -> [String] {
+        switch type.lowercased() {
+        case "char": return string.map { String($0) }
+        case "word": return string.split { $0 == " " || $0 == "\n" || $0 == "\t" }.map(String.init)
+        case "item": return string.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        case "line": return string.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        default: return [string]
+        }
+    }
+    
+    private func chunkJoiner(for type: String) -> String {
+        switch type.lowercased() {
+        case "word": return " "
+        case "item": return ","
+        case "line": return "\n"
+        default: return ""
+        }
+    }
     
     /// Checks if a string or list contains the given value.
     public func contains(_ other: LingoValue) -> LingoValue {
@@ -299,6 +360,10 @@ public enum LingoValue {
         }
         return .integer(0)
     }
+}
+
+public func ~= (pattern: LingoValue, value: LingoValue) -> Bool {
+    return LingoValue.equalsBool(lhs: pattern, rhs: value)
 }
 
 // MARK: - Swift Collection Conformance
