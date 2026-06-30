@@ -37,6 +37,15 @@ public enum LingoValue {
     /// Accesses properties on Lingo objects dynamically.
     public subscript(dynamicMember member: String) -> LingoValue {
         get {
+            if member.caseInsensitiveEquals("count") {
+                switch self {
+                case .listType(let arr): return .integer(arr.elements.count)
+                case .propertyListType(let props): return .integer(props.elements.count)
+                case .string(let s): return .integer(s.count)
+                default: return .integer(0)
+                }
+            }
+
             if case .object(let obj) = self {
                 let prop = obj.getProperty(member)
                 if case .void = prop {} else { return prop }
@@ -405,19 +414,16 @@ public func ~= (pattern: LingoValue, value: LingoValue) -> Bool {
     return LingoValue.equalsBool(lhs: pattern, rhs: value)
 }
 
-// MARK: - Swift Collection Conformance
+// MARK: - Swift Subscript
 
-extension LingoValue: RandomAccessCollection {
-    public typealias Index = Int
-    public typealias Element = LingoValue
-
-    public var startIndex: Int { 0 }
-
-    public var endIndex: Int {
+extension LingoValue {
+    /// Explicit count property to shadow Sequence.count(where:)
+    public var count: LingoValue {
         switch self {
-        case .listType(let arr): return arr.elements.count
-        case .propertyListType(let props): return props.elements.count
-        default: return 0
+        case .listType(let arr): return .integer(arr.elements.count)
+        case .propertyListType(let props): return .integer(props.elements.count)
+        case .string(let s): return .integer(s.count)
+        default: return .integer(0)
         }
     }
 
@@ -440,6 +446,18 @@ extension LingoValue: RandomAccessCollection {
             default:
                 break
             }
+        }
+    }
+}
+
+// MARK: - Swift Iteration Support
+
+extension LingoValue {
+    public func asSequence() -> [LingoValue] {
+        switch self {
+        case .listType(let arr): return arr.elements
+        case .propertyListType(let props): return props.elements.map { $0.value }
+        default: return []
         }
     }
 }
