@@ -322,6 +322,11 @@ public final class LingoTranspiler {
             output += "\(indent)break\n"
         case .nextRepeat:
             output += "\(indent)continue\n"
+        case .pass:
+            // Notify the runtime, then halt the current handler: per Lingo
+            // semantics, no statements following `pass` execute.
+            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"pass\", args: [])\n"
+            output += activeHandlerIsInitializer ? "\(indent)return\n" : "\(indent)return .void\n"
         case .caseStatement(let cond, let cases, let otherwise):
             let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
             output += "\(indent)switch \(condStr) {\n"
@@ -460,7 +465,8 @@ public final class LingoTranspiler {
             case .notEquals: return "(\(l) != \(r))"
             case .logicalAnd: return "((\(l)).asBool() && (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
             case .logicalOr: return "((\(l)).asBool() || (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
-            case .stringConcat, .stringConcatSpace: return "(\(l) + \(r))"
+            case .stringConcat: return "\(l).concat(\(r))"
+            case .stringConcatSpace: return "\(l).concatSpace(\(r))"
             case .modulo: return "(\(l) % \(r))"
             case .contains: return "\(l).contains(\(r))"
             case .starts: return "\(l).starts(with: \(r))"
@@ -571,6 +577,7 @@ private extension ChunkType {
         case .word: return "word"
         case .item: return "item"
         case .line: return "line"
+        case .paragraph: return "paragraph"
         }
     }
 }
