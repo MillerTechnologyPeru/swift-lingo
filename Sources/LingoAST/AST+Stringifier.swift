@@ -96,6 +96,8 @@ extension Statement {
             return pad + "exit repeat"
         case .nextRepeat:
             return pad + "next repeat"
+        case .pass:
+            return pad + "pass"
         case .caseStatement(let cond, let cases, let otherwise):
             let header = pad + "case \(cond.toLingoSource()) of"
             var result = header + "\n"
