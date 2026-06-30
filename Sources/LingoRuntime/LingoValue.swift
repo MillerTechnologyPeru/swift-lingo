@@ -32,6 +32,19 @@ public enum LingoValue: Equatable {
         }
     }
     
+    public subscript(index: LingoValue) -> LingoValue {
+        get {
+            return .void // TODO: List indexing and property list lookup
+        }
+        nonmutating set {
+            // TODO: List element assignment
+        }
+    }
+    
+    public func getRange(start: LingoValue, end: LingoValue) -> LingoValue {
+        return .void // TODO: string chunks
+    }
+    
     public func dynamicallyCall(withArguments args: [LingoValue]) -> LingoValue {
         switch self {
         case .boundMethod(let obj, let name):
