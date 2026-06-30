@@ -98,6 +98,7 @@ public class Parser {
             } while match(.comma)
             return .global(names: names)
         } else {
+            if matchKeyword("end") { return nil } // Ignore stray ends
             // Might be a top-level statement or error
             return parseStatement()
         }
@@ -185,6 +186,7 @@ public class Parser {
                     return .put(type: .before, value: value, target: target)
                 }
             }
+            return .put(type: .display, value: value, target: nil)
         } else if matchKeyword("delete") {
              // simplified delete support
              guard let target = parseExpression() else { return nil }
@@ -369,34 +371,46 @@ public class Parser {
                  break
              } else {
                  // case value:
-                 guard let val = parseExpression() else { break }
-                 _ = match(.colon)
-                 var body: [Statement] = []
-                 while !isAtEnd {
-                     skipNewlines()
-                     if check(.identifier("")) || check(.number(0)) || check(.string("")) || check(.symbol("")) {
-                         // Next case starts, though Lingo 'case' is loose. We'll break if we see another case literal or end/otherwise.
-                         // This is a naive check. A better approach checks if the next line is a simple expression followed by a colon.
-                         let peek1 = peek()
-                         if case .identifier(let id) = peek1 {
-                              if id.lowercased() == "end" || id.lowercased() == "otherwise" { break }
-                         }
-                         // Actually, in Lingo, case statements can be tricky. We just assume single statements or explicit ends.
-                     }
-                     
-                     if matchKeyword("end") {
-                         _ = matchKeyword("case")
-                         return .caseStatement(condition: condition, cases: cases, otherwise: otherwise) // early exit hack for now
-                     }
-                     
-                     if let stmt = parseStatement() {
-                         body.append(stmt)
-                     } else {
-                         break
-                     }
-                 }
-                 cases.append(CaseBlock(values: [val], body: body))
-             }
+                // case value:
+                var values: [Expression] = []
+                if let first = parseExpression() {
+                    values.append(first)
+                    while match(.comma) {
+                        if let next = parseExpression() { values.append(next) }
+                    }
+                } else { break }
+                _ = match(.colon)
+                
+                var body: [Statement] = []
+                while !isAtEnd {
+                    skipNewlines()
+                    
+                    let peek1 = peek()
+                    if case .identifier(let id) = peek1 {
+                        let lower = id.lowercased()
+                        if lower == "end" || lower == "otherwise" { break }
+                    }
+                    
+                    // Lookahead to see if this is a new case (ends with colon before newline)
+                    var isNewCase = false
+                    var tempIdx = currentIndex
+                    while tempIdx < tokens.count {
+                        let t = tokens[tempIdx]
+                        if t == .colon { isNewCase = true; break }
+                        if t == .newline || t == .eof { break }
+                        if case .identifier(let id) = t, id.lowercased() == "end" { break }
+                        tempIdx += 1
+                    }
+                    if isNewCase { break }
+                    
+                    if let stmt = parseStatement() {
+                        body.append(stmt)
+                    } else {
+                        break
+                    }
+                }
+                cases.append(CaseBlock(values: values, body: body))
+            }
          }
          return .caseStatement(condition: condition, cases: cases, otherwise: otherwise)
     }
@@ -441,6 +455,7 @@ public class Parser {
         case .identifier(let id):
             let lower = id.lowercased()
             if lower == "and" || lower == "or" { return 1 }
+            if lower == "contains" || lower == "starts" { return 1 }
             if lower == "mod" { return 4 }
             return 0
         default:
@@ -466,6 +481,8 @@ public class Parser {
             let lower = id.lowercased()
             if lower == "and" { return .logicalAnd }
             if lower == "or" { return .logicalOr }
+            if lower == "contains" { return .contains }
+            if lower == "starts" { return .starts }
             if lower == "mod" { return .modulo }
             return nil
         default: return nil
@@ -486,16 +503,16 @@ public class Parser {
         } else if matchKeyword("the") {
             if matchKeyword("last") {
                 if matchKeyword("char") {
-                    _ = matchKeyword("of")
+                    if matchKeyword("of") || matchKeyword("in") { }
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .char, obj: target) }
                 } else if matchKeyword("word") {
-                    _ = matchKeyword("of")
+                    if matchKeyword("of") || matchKeyword("in") { }
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .word, obj: target) }
                 } else if matchKeyword("item") {
-                    _ = matchKeyword("of")
+                    if matchKeyword("of") || matchKeyword("in") { }
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .item, obj: target) }
                 } else if matchKeyword("line") {
-                    _ = matchKeyword("of")
+                    if matchKeyword("of") || matchKeyword("in") { }
                     if let target = parsePrimary() { baseExpr = .lastStringChunk(type: .line, obj: target) }
                 }
             } else if matchKeyword("number") {
@@ -678,8 +695,15 @@ public class Parser {
                 }
             } else if match(.leftBracket) {
                 if let index = parseExpression() {
-                    _ = match(.rightBracket)
-                    baseExpr = .elementAccess(target: baseExpr!, index: index)
+                    if match(.range) {
+                        if let endIndex = parseExpression() {
+                            _ = match(.rightBracket)
+                            baseExpr = .elementRangeAccess(target: baseExpr!, start: index, end: endIndex)
+                        }
+                    } else {
+                        _ = match(.rightBracket)
+                        baseExpr = .elementAccess(target: baseExpr!, index: index)
+                    }
                 }
             } else {
                 break
@@ -696,7 +720,7 @@ public class Parser {
          if matchKeyword("to") {
              _ = parsePrimary() // Ignoring range for now, simplify AST
          }
-         _ = matchKeyword("of")
+         if matchKeyword("of") || matchKeyword("in") { }
          guard let target = parsePrimary() else { return nil }
          return .chunkExpression(type: type, first: index, last: nil, string: target)
     }
