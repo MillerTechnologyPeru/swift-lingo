@@ -322,16 +322,16 @@ public enum LingoValue {
         case "char": return string.map { String($0) }
         case "word": return string.split { $0 == " " || $0 == "\n" || $0 == "\t" }.map(String.init)
         case "item": return string.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
-        case "line": return string.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        case "line", "paragraph": return string.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         default: return [string]
         }
     }
-    
+
     private func chunkJoiner(for type: String) -> String {
         switch type.asciiLowercased() {
         case "word": return " "
         case "item": return ","
-        case "line": return "\n"
+        case "line", "paragraph": return "\n"
         default: return ""
         }
     }
