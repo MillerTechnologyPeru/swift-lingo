@@ -50,11 +50,11 @@ struct SwiftLingoCompiler: ParsableCommand {
         let outputURL = URL(fileURLWithPath: outputDir)
         try? fileManager.createDirectory(at: outputURL, withIntermediateDirectories: true)
         
-        let transpiler = LingoTranspiler()
         var errorCount = 0
         
         for file in inputFiles {
             do {
+                let transpiler = LingoTranspiler()
                 let content = try String(contentsOf: file, encoding: .utf8)
                 var lexer = Lexer(input: content)
                 let tokens = lexer.tokenize()
@@ -62,7 +62,7 @@ struct SwiftLingoCompiler: ParsableCommand {
                 let script = parser.parseScript()
                 
                 if !parser.skippedTokens.isEmpty {
-                    print("Warning: \(file.lastPathComponent) had \(parser.skippedTokens.count) skipped tokens during parsing.")
+                    print("Warning: \(file.lastPathComponent) had \(parser.skippedTokens.count) skipped tokens during parsing. Tokens: \(parser.skippedTokens)")
                 }
                 
                 let relativePath: String
