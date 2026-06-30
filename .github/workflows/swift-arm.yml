@@ -1,0 +1,44 @@
+name: Swift Embedded
+on: [push]
+jobs:
+
+  # Bare-metal Embedded Swift for ARM (uses Apple mach-o object format)
+  baremetal-arm:
+    name: Baremetal ARM (${{ matrix.name }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ARM Cortex-M0+ (armv6m)
+            triple: armv6m-apple-none-macho
+            flags: "-Xcc -D__MACH__ -Xcc -ffreestanding -Xcc -mcpu=cortex-m0plus -Xcc -mthumb"
+          - name: ARM Cortex-M4 (armv7em)
+            triple: armv7em-apple-none-macho
+            flags: "-Xcc -D__MACH__ -Xcc -ffreestanding -Xcc -mcpu=cortex-m4 -Xcc -mthumb"
+          - name: ARM Cortex-M7 (armv7em)
+            triple: armv7em-apple-none-macho
+            flags: "-Xcc -D__MACH__ -Xcc -ffreestanding -Xcc -mcpu=cortex-m7 -Xcc -mthumb"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Install Swift Nightly
+      run: |
+        curl -sL https://download.swift.org/development/xcode/latest-build.yml > latest-build.yml
+        DIR=$(grep "dir:" latest-build.yml | awk '{print $2}')
+        DOWNLOAD=$(grep "download:" latest-build.yml | awk '{print $2}')
+        URL="https://download.swift.org/development/xcode/$DIR/$DOWNLOAD"
+        echo "Downloading $URL"
+        curl -sL "$URL" -o swift.pkg
+        sudo installer -pkg swift.pkg -target /
+        echo "TOOLCHAINS=swift" >> $GITHUB_ENV
+    - name: Swift Version
+      run: swift --version
+    - name: Build
+      run: >-
+        swift build
+        --triple ${{ matrix.triple }}
+        --configuration release
+        -Xswiftc -enable-experimental-feature -Xswiftc Embedded
+        ${{ matrix.flags }}
+        --target LingoRuntime
