@@ -425,9 +425,10 @@ public class LingoTranspiler {
             let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
             return "\(tStr).`\(prop)`"
         case .functionCall(let target, let name, let args):
-            let argStr = args.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
+            let lingoArgs = args.filter { !$0.isMeReference }
+            let argStr = lingoArgs.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
             if let t = target {
-                let tStr = transpile(expression: t, locals: locals, isMethod: isMethod)
+                let tStr = t.isMeReference ? "self" : transpile(expression: t, locals: locals, isMethod: isMethod)
                 return "\(tStr).`\(name)`(\(argStr))"
             } else {
                 if locals.contains(name.lowercased()) {
