@@ -1,11 +1,13 @@
-import XCTest
+import Testing
 @testable import LingoLexer
 
-final class LexerTests: XCTestCase {
+@Suite
+struct LexerTests {
+    @Test
     func testIdentifiersAndKeywords() {
         var lexer = Lexer(input: "on mouseUp me")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .identifier("on"),
             .identifier("mouseUp"),
             .identifier("me"),
@@ -13,40 +15,48 @@ final class LexerTests: XCTestCase {
         ])
     }
     
+    @Test
+    
     func testNumbers() {
         var lexer = Lexer(input: "123 45.67")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .integer(123),
             .number(45.67),
             .eof
         ])
     }
     
+    @Test
+    
     func testSymbols() {
         var lexer = Lexer(input: "#PREGAME #state")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .symbol("PREGAME"),
             .symbol("state"),
             .eof
         ])
     }
     
+    @Test
+    
     func testStrings() {
         var lexer = Lexer(input: "\"levels\" \"voice_ohyeah\"")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .string("levels"),
             .string("voice_ohyeah"),
             .eof
         ])
     }
     
+    @Test
+    
     func testPunctuation() {
         var lexer = Lexer(input: "[](),.:")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .leftBracket,
             .rightBracket,
             .leftParen,
@@ -58,20 +68,24 @@ final class LexerTests: XCTestCase {
         ])
     }
     
+    @Test
+    
     func testOperators() {
         var lexer = Lexer(input: "+ - * / = < > <= >= <> & &&")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .plus, .minus, .multiply, .divide, .equals,
             .lessThan, .greaterThan, .lessThanOrEqual, .greaterThanOrEqual, .notEquals,
             .concat, .concatSpace, .eof
         ])
     }
     
+    @Test
+    
     func testComments() {
         var lexer = Lexer(input: "on -- this is a comment\nme")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .identifier("on"),
             .newline,
             .identifier("me"),
@@ -79,10 +93,12 @@ final class LexerTests: XCTestCase {
         ])
     }
     
+    @Test
+    
     func testLineContinuation() {
         var lexer = Lexer(input: "on \\\n me")
         let tokens = lexer.tokenize()
-        XCTAssertEqual(tokens, [
+        #expect(tokens == [
             .identifier("on"),
             .identifier("me"),
             .eof

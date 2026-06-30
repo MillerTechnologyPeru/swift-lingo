@@ -1,9 +1,11 @@
-import XCTest
+import Testing
 @testable import LingoLexer
 @testable import LingoAST
 @testable import LingoParser
 
-final class ParserTests: XCTestCase {
+@Suite
+struct ParserTests {
+    @Test
     func testParseHandler() {
         let input = """
         on new me
@@ -17,28 +19,30 @@ final class ParserTests: XCTestCase {
         let parser = Parser(tokens: tokens)
         let script = parser.parseScript()
         
-        XCTAssertEqual(script.statements.count, 1)
+        #expect(script.statements.count == 1)
         if case .handler(let name, let args, let body) = script.statements[0] {
-            XCTAssertEqual(name, "new")
-            XCTAssertEqual(args, ["me"])
-            XCTAssertEqual(body.count, 2)
+            #expect(name == "new")
+            #expect(args == ["me"])
+            #expect(body.count == 2)
             
             if case .assignment(let target, let value) = body[0] {
-                XCTAssertEqual(target, .identifier("gameState"))
-                XCTAssertEqual(value, .symbol("PREGAME"))
+                #expect(target == .identifier("gameState"))
+                #expect(value == .symbol("PREGAME"))
             } else {
-                XCTFail("Expected assignment statement")
+                Issue.record("Expected assignment statement")
             }
             
             if case .returnStatement(let expr) = body[1] {
-                XCTAssertEqual(expr, .identifier("me"))
+                #expect(expr == .identifier("me"))
             } else {
-                XCTFail("Expected return statement")
+                Issue.record("Expected return statement")
             }
         } else {
-            XCTFail("Expected handler")
+            Issue.record("Expected handler")
         }
     }
+    
+    @Test
     
     func testParseRepeat() {
          let input = """
@@ -53,21 +57,24 @@ final class ParserTests: XCTestCase {
          let parser = Parser(tokens: tokens)
          let script = parser.parseScript()
          
-         XCTAssertEqual(script.statements.count, 1)
+         #expect(script.statements.count == 1)
          if case .handler(_, _, let body) = script.statements[0] {
-             XCTAssertEqual(body.count, 1)
-             if case .repeatWithCounter(let variable, let start, let end, let rBody) = body[0] {
-                 XCTAssertEqual(variable, "n")
-                 XCTAssertEqual(start, .integer(1))
-                 XCTAssertEqual(end, .integer(5))
-                 XCTAssertEqual(rBody.count, 1)
+             #expect(body.count == 1)
+             if case .repeatWithCounter(let variable, let start, let end, let rBody, let up) = body[0] {
+                 #expect(variable == "n")
+                 #expect(start == .integer(1))
+                 #expect(end == .integer(5))
+                 #expect(rBody.count == 1)
+                 #expect(up)
              } else {
-                 XCTFail("Expected repeat statement")
+                 Issue.record("Expected repeat statement")
              }
          } else {
-             XCTFail("Expected handler")
+             Issue.record("Expected handler")
          }
     }
+    
+    @Test
     
     func testParseIf() {
         let input = """
@@ -85,19 +92,19 @@ final class ParserTests: XCTestCase {
         let parser = Parser(tokens: tokens)
         let script = parser.parseScript()
         
-        XCTAssertEqual(script.statements.count, 1)
+        #expect(script.statements.count == 1)
         if case .handler(_, _, let body) = script.statements[0] {
-             XCTAssertEqual(body.count, 1)
+             #expect(body.count == 1)
              if case .ifStatement(let condition, let ifBody, let elseBody) = body[0] {
                   if case .binaryOperation(let left, let op, let right) = condition {
-                      XCTAssertEqual(left, .identifier("x"))
-                      XCTAssertEqual(op, .lessThan)
-                      XCTAssertEqual(right, .integer(10))
-                  } else { XCTFail() }
-                  XCTAssertEqual(ifBody.count, 1)
-                  XCTAssertNotNil(elseBody)
-                  XCTAssertEqual(elseBody?.count, 1)
-             } else { XCTFail() }
+                      #expect(left == .identifier("x"))
+                      #expect(op == .lessThan)
+                      #expect(right == .integer(10))
+                  } else { Issue.record("Expected binary operation") }
+                  #expect(ifBody.count == 1)
+                  #expect(elseBody != nil)
+                  #expect(elseBody?.count == 1)
+             } else { Issue.record("Expected if statement") }
         }
     }
 }
