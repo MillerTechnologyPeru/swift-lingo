@@ -1,0 +1,37 @@
+name: Swift
+on: [push]
+jobs:
+
+  macos:
+    name: macOS
+    runs-on: macos-26
+    strategy:
+      matrix:
+        config: ["debug", "release"]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Swift Version
+      run: swift --version
+    - name: Build
+      run: swift build -c ${{ matrix.config }}
+    - name: Test
+      run: swift test -c ${{ matrix.config }}
+
+  linux:
+    name: Linux
+    strategy:
+      matrix:
+        container: ["swift:6.3.2"]
+        config: ["debug", "release"]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}-jammy
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Swift Version
+      run: swift --version
+    - name: Build
+      run: swift build -c ${{ matrix.config }}
+    - name: Test
+      run: swift test -c ${{ matrix.config }}
