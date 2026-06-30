@@ -223,6 +223,8 @@ public class LingoTranspiler {
                 } else {
                     output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
                 }
+            } else if let memberProperty = transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
+                output += "\(indent)\(memberProperty)\n"
             } else if case .propertyAccess(let obj, let prop) = target {
                 let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
                 output += "\(indent)\(objStr).setProperty(\"\(prop)\", value: \(valStr))\n"
@@ -361,6 +363,37 @@ public class LingoTranspiler {
         return output
     }
     
+    private func transpileMemberSpritePropertyAssignment(target: LingoAST.Expression, value: String, locals: Set<String>, isMethod: Bool) -> String? {
+        guard case .member(let type, let id, nil) = target,
+              type.lowercased() == "member" else { return nil }
+        
+        let chain = propertyChain(from: id)
+        guard case .identifier(let baseName) = chain.base,
+              baseName.lowercased() == "me",
+              chain.properties.count >= 3,
+              chain.properties[0].lowercased() == "spritenum",
+              chain.properties[1].lowercased() == "member" else { return nil }
+        
+        let propertyName = chain.properties[chain.properties.count - 1]
+        var receiver = isMethod ? "self.`sprite`(LingoValue.object(self).`spriteNum`).`member`" : "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoEnvironment.shared.getGlobal(\"spriteNum\")]).`member`"
+        if chain.properties.count > 3 {
+            for property in chain.properties.dropFirst(2).dropLast() {
+                receiver += ".`\(property)`"
+            }
+        }
+        return "\(receiver).setProperty(\"\(escapeSwiftString(propertyName))\", value: \(value))"
+    }
+    
+    private func propertyChain(from expression: LingoAST.Expression) -> (base: LingoAST.Expression, properties: [String]) {
+        switch expression {
+        case .propertyAccess(let target, let property):
+            let chain = propertyChain(from: target)
+            return (chain.base, chain.properties + [property])
+        default:
+            return (expression, [])
+        }
+    }
+    
     private func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
         switch expression {
         case .void: return ".void"
@@ -371,7 +404,7 @@ public class LingoTranspiler {
         case .boolean(let v): return ".integer(\(v ? 1 : 0))"
         case .identifier(let name):
             let lower = name.lowercased()
-            if lower == "me" { return ".object(self)" }
+            if lower == "me" { return "LingoValue.object(self)" }
             if lower == "void" { return ".void" }
             if locals.contains(lower) {
                 return "`\(lower)`"
@@ -485,9 +518,10 @@ public class LingoTranspiler {
         case .spriteProp(let spriteId, let prop):
             let spriteStr = transpile(expression: spriteId, locals: locals, isMethod: isMethod)
             return "LingoEnvironment.shared.callGlobal(\"sprite\", args: [\(spriteStr)]).`\(prop)`"
-        case .member(_, let id, _):
+        case .member(let type, let id, _):
             let idStr = transpile(expression: id, locals: locals, isMethod: isMethod)
-            return isMethod ? "self.`member`(\(idStr))" : "LingoEnvironment.shared.callGlobal(\"member\", args: [\(idStr)])"
+            let functionName = type.lowercased() == "sprite" ? "sprite" : "member"
+            return isMethod ? "self.`\(functionName)`(\(idStr))" : "LingoEnvironment.shared.callGlobal(\"\(functionName)\", args: [\(idStr)])"
         case .newObj(let type, let args):
             let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod)
             return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
