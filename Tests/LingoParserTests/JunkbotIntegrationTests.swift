@@ -8,18 +8,8 @@ struct JunkbotIntegrationTests {
     @Test
     
     func testParseAllJunkbotFiles() throws {
-        let junkbotDir = URL(fileURLWithPath: "/Users/coleman/Downloads/junkbot-code-main")
-        
-        let fileManager = FileManager.default
-        let enumerator = fileManager.enumerator(at: junkbotDir, includingPropertiesForKeys: nil)
-        
-        var lsFiles: [URL] = []
-        while let fileURL = enumerator?.nextObject() as? URL {
-            if fileURL.pathExtension == "ls" {
-                lsFiles.append(fileURL)
-            }
-        }
-        
+        let lsFiles = JunkbotFixtures.allLingoFiles()
+
         #expect(lsFiles.count > 0, "Should find at least some .ls files")
         
         var failedFiles: [String] = []

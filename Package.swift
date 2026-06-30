@@ -29,6 +29,7 @@ let package = Package(
         .testTarget(
             name: "LingoParserTests",
             dependencies: ["LingoParser", "LingoAST"],
+            resources: [.copy("Resources")],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         // Transpiler (Library)
