@@ -10,7 +10,7 @@ public class LingoEnvironment {
     public init() {}
     
     public func getGlobal(_ name: String) -> LingoValue {
-        let lower = name.lowercased()
+        let lower = name.asciiLowercased()
         for i in 0..<globals.count {
             if globals[i].key == lower {
                 return globals[i].value
@@ -20,7 +20,7 @@ public class LingoEnvironment {
     }
     
     public func setGlobal(_ name: String, _ value: LingoValue) {
-        let lower = name.lowercased()
+        let lower = name.asciiLowercased()
         for i in 0..<globals.count {
             if globals[i].key == lower {
                 globals[i] = (key: lower, value: value)
@@ -31,12 +31,12 @@ public class LingoEnvironment {
     }
     
     public func registerGlobalFunction(_ name: String, _ function: @escaping ([LingoValue]) -> LingoValue) {
-        let lower = name.lowercased()
+        let lower = name.asciiLowercased()
         globalFunctions.append((key: lower, value: function))
     }
     
     public func callGlobal(_ name: String, args: [LingoValue]) -> LingoValue {
-        let lower = name.lowercased()
+        let lower = name.asciiLowercased()
         for i in 0..<globalFunctions.count {
             if globalFunctions[i].key == lower {
                 return globalFunctions[i].value(args)
