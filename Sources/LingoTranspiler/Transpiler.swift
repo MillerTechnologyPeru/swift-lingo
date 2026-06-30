@@ -5,17 +5,16 @@ import LingoParser
 public class LingoTranspiler {
     public init() {}
     
-    public func transpile(script: Script, fileName: String, originalPath: String) -> String {
+    public func transpile(script: Script, relativePath: String, originalPath: String) -> String {
         let pathComponents = originalPath.split(separator: "/")
         let shortPath = pathComponents.count >= 2 ? pathComponents.suffix(2).joined(separator: "/") : originalPath
         var output = "// Transpiled from \(shortPath)\n"
         output += "import LingoRuntime\n\n"
         
-        let isParent = fileName.lowercased().hasPrefix("parent_")
-        let isBehavior = fileName.lowercased().hasPrefix("behavior_")
+        let isMovie = relativePath.lowercased().contains("movie_")
         
-        if isParent || isBehavior {
-            let className = formatClassName(fileName)
+        if !isMovie {
+            let className = formatClassName(relativePath)
             output += "public class \(className): LingoObject {\n"
             
             // Collect properties
@@ -27,15 +26,14 @@ public class LingoTranspiler {
             }
             
             for prop in properties {
-                output += "    public var \(prop): LingoValue = .void\n"
+                output += "    public var `\(prop)`: LingoValue = .void\n"
             }
             if !properties.isEmpty { output += "\n" }
             
-            // Convert properties to override get/set
             output += "    public override func getProperty(_ name: String) -> LingoValue {\n"
             output += "        switch name.lowercased() {\n"
             for prop in properties {
-                output += "        case \"\(prop.lowercased())\": return \(prop)\n"
+                output += "        case \"\(prop.lowercased())\": return self.`\(prop)`\n"
             }
             output += "        default: return super.getProperty(name)\n"
             output += "        }\n"
@@ -44,7 +42,7 @@ public class LingoTranspiler {
             output += "    public override func setProperty(_ name: String, value: LingoValue) {\n"
             output += "        switch name.lowercased() {\n"
             for prop in properties {
-                output += "        case \"\(prop.lowercased())\": \(prop) = value\n"
+                output += "        case \"\(prop.lowercased())\": self.`\(prop)` = value\n"
             }
             output += "        default: super.setProperty(name, value: value)\n"
             output += "        }\n"
@@ -78,10 +76,10 @@ public class LingoTranspiler {
             output += "    public override init() {\n"
             output += "        super.init()\n"
         } else {
-            let funcName = isMethod ? name : "lingo_\(name)"
+            let funcName = isMethod ? "`\(name)`" : "lingo_\(name)"
             let indent = isMethod ? "    " : ""
             output += "\(indent)public func \(funcName)("
-            let swiftArgs = args.filter { $0.lowercased() != "me" }.map { "_ \($0): LingoValue" }.joined(separator: ", ")
+            let swiftArgs = args.filter { $0.lowercased() != "me" }.map { "_ `\($0)`: LingoValue" }.joined(separator: ", ")
             output += "\(swiftArgs)) -> LingoValue {\n"
         }
         
@@ -98,8 +96,8 @@ public class LingoTranspiler {
         return output
     }
     
-    private func formatClassName(_ fileName: String) -> String {
-        let name = fileName.replacingOccurrences(of: ".ls", with: "")
+    private func formatClassName(_ relativePath: String) -> String {
+        let name = relativePath.replacingOccurrences(of: ".ls", with: "")
         let components = name.split { !$0.isLetter && !$0.isNumber }
         return components.map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }.joined()
     }

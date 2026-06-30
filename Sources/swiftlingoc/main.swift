@@ -66,14 +66,14 @@ struct SwiftLingoC: ParsableCommand {
                     print("Warning: \(file.lastPathComponent) had \(parser.skippedTokens.count) skipped tokens during parsing.")
                 }
                 
-                let transpiledCode = transpiler.transpile(script: script, fileName: file.lastPathComponent, originalPath: file.path)
-                
                 let relativePath: String
                 if isDir.boolValue {
                     relativePath = file.path.replacingOccurrences(of: inputURL.path, with: "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                 } else {
                     relativePath = file.lastPathComponent
                 }
+                
+                let transpiledCode = transpiler.transpile(script: script, relativePath: relativePath, originalPath: file.path)
                 
                 let disambiguatedName = relativePath.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ".ls", with: ".swift")
                 let outputFile = outputURL.appendingPathComponent(disambiguatedName)
