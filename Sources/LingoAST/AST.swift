@@ -130,5 +130,5 @@ public enum PutType: String, CaseIterable, Sendable {
     case into
     case after
     case before
-    case display
+    case display = ""
 }
