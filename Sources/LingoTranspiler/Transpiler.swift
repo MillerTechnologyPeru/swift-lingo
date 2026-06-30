@@ -6,7 +6,9 @@ public class LingoTranspiler {
     public init() {}
     
     public func transpile(script: Script, fileName: String, originalPath: String) -> String {
-        var output = "// Transpiled from \(originalPath)\n"
+        let pathComponents = originalPath.split(separator: "/")
+        let shortPath = pathComponents.count >= 2 ? pathComponents.suffix(2).joined(separator: "/") : originalPath
+        var output = "// Transpiled from \(shortPath)\n"
         output += "import LingoRuntime\n\n"
         
         let isParent = fileName.lowercased().hasPrefix("parent_")
