@@ -21,6 +21,7 @@ public enum Statement: Equatable {
     case exit
     case exitRepeat
     case nextRepeat
+    case pass
     case caseStatement(condition: Expression, cases: [CaseBlock], otherwise: [Statement]?)
     case tell(window: Expression, body: [Statement])
     case when(event: String, script: String)
@@ -99,6 +100,7 @@ public enum ChunkType: String, CaseIterable, Sendable {
     case word
     case item
     case line
+    case paragraph
 }
 
 public enum BinaryOperator: String, CaseIterable, Sendable {
