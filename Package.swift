@@ -68,8 +68,13 @@ let package = Package(
             name: "LingoRuntime",
             swiftSettings: [
                 .enableUpcomingFeature("ApproachableConcurrency"),
-                .treatWarning("EmbeddedRestrictions", as: .warning)
+                .treatWarning("EmbeddedRestrictions", as: .error)
             ]
+        ),
+        .testTarget(
+            name: "LingoRuntimeTests",
+            dependencies: ["LingoRuntime"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
     ]
 )
