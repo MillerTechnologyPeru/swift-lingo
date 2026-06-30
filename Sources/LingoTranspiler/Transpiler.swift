@@ -191,7 +191,20 @@ public final class LingoTranspiler {
         }
 
         if !isInitializer {
-            output += "\(indent)return .void\n"
+            let needsReturnVoid: Bool
+            if let last = body.last {
+                switch last {
+                case .returnStatement, .exit, .pass:
+                    needsReturnVoid = false
+                default:
+                    needsReturnVoid = true
+                }
+            } else {
+                needsReturnVoid = true
+            }
+            if needsReturnVoid {
+                output += "\(indent)return .void\n"
+            }
         }
         let endIndent = isMethod ? "    " : ""
         output += "\(endIndent)}\n\n"
