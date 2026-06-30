@@ -157,6 +157,13 @@ public class LingoTranspiler {
                     let prefix = isMethod ? "self." : "LingoEnvironment.shared."
                     output += "\(indent)\(prefix)`\(name)` = \(valStr)\n"
                 }
+            } else if case .propertyAccess(let obj, let prop) = target {
+                let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+                output += "\(indent)\(objStr).setProperty(\"\(prop)\", value: \(valStr))\n"
+            } else if case .elementAccess(let obj, let indexExpr) = target {
+                let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+                let idxStr = transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
+                output += "\(indent)\(objStr).setElement(index: \(idxStr), value: \(valStr))\n"
             } else {
                 let targetStr = transpile(expression: target, locals: locals, isMethod: isMethod)
                 output += "\(indent)\(targetStr) = \(valStr)\n"
@@ -263,6 +270,7 @@ public class LingoTranspiler {
         case .boolean(let v): return ".integer(\(v ? 1 : 0))"
         case .identifier(let name):
             let lower = name.lowercased()
+            if lower == "me" { return ".object(self)" }
             if locals.contains(lower) {
                 return "`\(lower)`"
             } else {
