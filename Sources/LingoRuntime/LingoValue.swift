@@ -1,6 +1,47 @@
 // LingoValue.swift
 // LingoRuntime module - Embedded Swift compatible
 
+/// Custom case-insensitive string operations to avoid Foundation dependency
+fileprivate func _caseInsensitiveEquals(_ l: String, _ r: String) -> Bool {
+    return l.lowercased() == r.lowercased()
+}
+
+fileprivate func _caseInsensitiveLessThan(_ l: String, _ r: String) -> Bool {
+    return l.lowercased() < r.lowercased()
+}
+
+fileprivate func _caseInsensitiveContains(_ s: String, _ substr: String) -> Bool {
+    let lowerS = s.lowercased()
+    let lowerSub = substr.lowercased()
+    let sChars = Array(lowerS)
+    let subChars = Array(lowerSub)
+    if subChars.isEmpty { return true }
+    if subChars.count > sChars.count { return false }
+    for i in 0...(sChars.count - subChars.count) {
+        var match = true
+        for j in 0..<subChars.count {
+            if sChars[i+j] != subChars[j] {
+                match = false
+                break
+            }
+        }
+        if match { return true }
+    }
+    return false
+}
+
+fileprivate func _caseInsensitiveStartsWith(_ s: String, _ prefix: String) -> Bool {
+    let lowerS = s.lowercased()
+    let lowerPref = prefix.lowercased()
+    let sChars = Array(lowerS)
+    let pChars = Array(lowerPref)
+    if pChars.count > sChars.count { return false }
+    for i in 0..<pChars.count {
+        if sChars[i] != pChars[i] { return false }
+    }
+    return true
+}
+
 /// Represents a value in the Lingo runtime.
 @dynamicMemberLookup
 @dynamicCallable
@@ -118,8 +159,8 @@ public enum LingoValue {
               case .integer(let sIdx) = start,
               case .integer(let eIdx) = end else { return .void }
         
-        let safeStart = max(1, sIdx)
-        let safeEnd = min(s.count, eIdx)
+        let safeStart = Swift.max(1, sIdx)
+        let safeEnd = Swift.min(s.count, eIdx)
         if safeStart > safeEnd || safeStart > s.count { return .string("") }
         
         let startStrIdx = s.index(s.startIndex, offsetBy: safeStart - 1)
@@ -130,8 +171,8 @@ public enum LingoValue {
     /// 0-based range extraction for Swift convenience.
     public func getRange(start: Int, end: Int) -> LingoValue {
         guard case .string(let s) = self else { return .void }
-        let safeStart = max(0, start)
-        let safeEnd = min(s.count, end)
+        let safeStart = Swift.max(0, start)
+        let safeEnd = Swift.min(s.count, end)
         if safeStart > safeEnd || safeStart >= s.count { return .string("") }
         
         let startStrIdx = s.index(s.startIndex, offsetBy: safeStart)
@@ -156,7 +197,7 @@ public enum LingoValue {
         switch self {
         case .integer(let v): return v != 0
         case .float(let v): return v != 0
-        case .string(let v): return v.lowercased() == "true"
+        case .string(let v): return _caseInsensitiveEquals(v, "true")
         case .void: return false
         default: return true
         }
@@ -172,10 +213,10 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return l == r
         case (.integer(let l), .float(let r)): return Double(l) == r
         case (.float(let l), .integer(let r)): return l == Double(r)
-        case (.string(let l), .string(let r)): return l.lowercased() == r.lowercased()
-        case (.symbol(let l), .symbol(let r)): return l.lowercased() == r.lowercased()
-        case (.symbol(let l), .string(let r)): return l.lowercased() == r.lowercased()
-        case (.string(let l), .symbol(let r)): return l.lowercased() == r.lowercased()
+        case (.string(let l), .string(let r)): return _caseInsensitiveEquals(l, r)
+        case (.symbol(let l), .symbol(let r)): return _caseInsensitiveEquals(l, r)
+        case (.symbol(let l), .string(let r)): return _caseInsensitiveEquals(l, r)
+        case (.string(let l), .symbol(let r)): return _caseInsensitiveEquals(l, r)
         case (.object(let l), .object(let r)): return l === r
         case (.list(let l), .list(let r)):
             if l.count != r.count { return false }
@@ -199,7 +240,7 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return l < r
         case (.integer(let l), .float(let r)): return Double(l) < r
         case (.float(let l), .integer(let r)): return l < Double(r)
-        case (.string(let l), .string(let r)): return l.lowercased() < r.lowercased()
+        case (.string(let l), .string(let r)): return _caseInsensitiveLessThan(l, r)
         default: return false // fallback
         }
     }
@@ -279,7 +320,7 @@ public enum LingoValue {
     public func contains(_ other: LingoValue) -> LingoValue {
         switch (self, other) {
         case (.string(let s), .string(let substr)):
-            return s.lowercased().contains(substr.lowercased()) ? .integer(1) : .integer(0)
+            return _caseInsensitiveContains(s, substr) ? .integer(1) : .integer(0)
         case (.list(let arr), _):
             for item in arr {
                 if LingoValue.equalsBool(lhs: item, rhs: other) {
@@ -295,7 +336,7 @@ public enum LingoValue {
     /// Checks if a string starts with the given prefix.
     public func starts(with other: LingoValue) -> LingoValue {
         if case .string(let s) = self, case .string(let prefix) = other {
-            return s.lowercased().hasPrefix(prefix.lowercased()) ? .integer(1) : .integer(0)
+            return _caseInsensitiveStartsWith(s, prefix) ? .integer(1) : .integer(0)
         }
         return .integer(0)
     }
