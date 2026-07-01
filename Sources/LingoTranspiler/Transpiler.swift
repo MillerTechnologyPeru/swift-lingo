@@ -169,12 +169,14 @@ public final class LingoTranspiler {
 
         let indent = isMethod ? "        " : "    "
 
-        var locals = Set<String>()
+        var mutatedVars = Set<String>()
         var globals = Set<String>()
-        collectVariables(in: body, locals: &locals, globals: &globals)
-        for arg in args { locals.insert(arg.lowercased()) }
+        collectVariables(in: body, locals: &mutatedVars, globals: &globals)
+        
+        var locals = mutatedVars
         locals.subtract(globals)
         locals.subtract(properties)
+        for arg in args { locals.insert(arg.lowercased()) }
 
         let argumentNames = Set(args.map { $0.lowercased() })
         let hoisted = locals.filter { !argumentNames.contains($0) }.sorted()
@@ -182,7 +184,8 @@ public final class LingoTranspiler {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
         }
         for arg in args where arg.lowercased() != "me" {
-            output += "\(indent)var `\(arg.lowercased())`: LingoValue = `\(arg.lowercased())`\n"
+            let keyword = mutatedVars.contains(arg.lowercased()) ? "var" : "let"
+            output += "\(indent)\(keyword) `\(arg.lowercased())`: LingoValue = `\(arg.lowercased())`\n"
         }
         if !hoisted.isEmpty || args.count > (args.contains { $0.lowercased() == "me" } ? 1 : 0) { output += "\n" }
 
