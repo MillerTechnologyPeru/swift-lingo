@@ -268,7 +268,14 @@ public final class LingoTranspiler {
     }
 
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
-        let commentedSource = statement.toLingoSource().split(separator: "\n", omittingEmptySubsequences: false).map { "\(indent)// \($0)" }.joined(separator: "\n")
+        let maxCommentDepth = 8
+        let commentedSource: String
+        if expressionDepth(of: statement) <= maxCommentDepth {
+            commentedSource = statement.toLingoSource().split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "\(indent)// \($0)" }.joined(separator: "\n")
+        } else {
+            commentedSource = "\(indent)// (complex expression omitted)"
+        }
         var output = "\(commentedSource)\n"
         switch statement {
         case .global, .property:
@@ -511,21 +518,36 @@ public final class LingoTranspiler {
             let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
             let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod)
             return "\(objStr)(\(argStr))"
-        case .binaryOperation(let left, let op, let right):
-            let l = transpile(expression: left, locals: locals, isMethod: isMethod)
-            let r = transpile(expression: right, locals: locals, isMethod: isMethod)
-            switch op {
-            case .equals: return "(\(l) == \(r))"
-            case .notEquals: return "(\(l) != \(r))"
-            case .logicalAnd: return "((\(l)).asBool() && (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
-            case .logicalOr: return "((\(l)).asBool() || (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
-            case .stringConcat: return "\(l).concat(\(r))"
-            case .stringConcatSpace: return "\(l).concatSpace(\(r))"
-            case .modulo: return "(\(l) % \(r))"
-            case .contains: return "\(l).contains(\(r))"
-            case .starts: return "\(l).starts(with: \(r))"
-            default: return "(\(l) \(op.rawValue) \(r))"
+        case .binaryOperation:
+            // Unroll the left-leaning chain iteratively to avoid stack overflow
+            // on deeply nested expressions (e.g. 60+ chained & concatenations).
+            typealias Rhs = (op: LingoAST.BinaryOperator, expr: LingoAST.Expression)
+            var rhsTerms: [Rhs] = []
+            var current = expression
+            while case .binaryOperation(let left, let op, let right) = current {
+                rhsTerms.append((op: op, expr: right))
+                current = left
             }
+            rhsTerms.reverse()
+            var result = transpile(expression: current, locals: locals, isMethod: isMethod)
+            for (op, rExpr) in rhsTerms {
+                let r = transpile(expression: rExpr, locals: locals, isMethod: isMethod)
+                switch op {
+                case .equals: result = "(\(result) == \(r))"
+                case .notEquals: result = "(\(result) != \(r))"
+                case .logicalAnd:
+                    result = "((\(result)).asBool() && (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
+                case .logicalOr:
+                    result = "((\(result)).asBool() || (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
+                case .stringConcat: result = "\(result).concat(\(r))"
+                case .stringConcatSpace: result = "\(result).concatSpace(\(r))"
+                case .modulo: result = "(\(result) % \(r))"
+                case .contains: result = "\(result).contains(\(r))"
+                case .starts: result = "\(result).starts(with: \(r))"
+                default: result = "(\(result) \(op.rawValue) \(r))"
+                }
+            }
+            return result
         case .unaryOperation(let op, let operand):
             let opr = transpile(expression: operand, locals: locals, isMethod: isMethod)
             if op == .not {
@@ -609,6 +631,36 @@ public final class LingoTranspiler {
         let name = relativePath.replacingOccurrences(of: ".ls", with: "")
         let components = name.split { !$0.isLetter && !$0.isNumber }
         return components.map { $0.prefix(1).uppercased() + String($0.dropFirst()).lowercased() }.joined()
+    }
+
+    /// Returns the maximum nesting depth of expressions within a statement,
+    /// capped at `limit` to avoid spending time on deeply recursive trees.
+    private func expressionDepth(of statement: Statement, limit: Int = 9) -> Int {
+        switch statement {
+        case .returnStatement(let e):
+            return e.map { expressionDepth(of: $0, limit: limit) } ?? 0
+        case .assignment(let t, let v, _):
+            return max(expressionDepth(of: t, limit: limit), expressionDepth(of: v, limit: limit))
+        case .put(_, let v, let t):
+            let td = t.map { expressionDepth(of: $0, limit: limit) } ?? 0
+            return max(expressionDepth(of: v, limit: limit), td)
+        default:
+            return 0
+        }
+    }
+
+    private func expressionDepth(of expr: LingoAST.Expression, limit: Int = 9) -> Int {
+        guard limit > 0 else { return limit }
+        switch expr {
+        case .binaryOperation(let l, _, let r):
+            let ld = expressionDepth(of: l, limit: limit - 1)
+            if ld >= limit { return limit }
+            return max(ld, expressionDepth(of: r, limit: limit - 1)) + 1
+        case .unaryOperation(_, let o):
+            return expressionDepth(of: o, limit: limit - 1) + 1
+        default:
+            return 1
+        }
     }
 
     private func escapeSwiftString(_ value: String) -> String {
