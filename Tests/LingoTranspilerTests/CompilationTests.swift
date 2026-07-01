@@ -81,7 +81,7 @@ struct CompilationTests {
             dependency = ".package(name: \"SwiftLingo\", path: \"\(swiftLingoPath)\")"
             packageIdentity = "SwiftLingo"
         } else {
-            dependency = ".package(url: \"https://github.com/MillerTechnologyPeru/swift-lingo\", branch: \"main\")"
+            dependency = ".package(url: \"https://github.com/MillerTechnologyPeru/swift-lingo\", branch: \"master\")"
             packageIdentity = "swift-lingo"
         }
 
