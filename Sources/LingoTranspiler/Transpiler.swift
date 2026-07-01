@@ -4,6 +4,9 @@ import LingoParser
 
 public final class LingoTranspiler {
 
+    /// Optional logger. When set, the transpiler calls this with diagnostic messages.
+    public var log: ((String) -> Void)?
+
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
     private var script: Script
@@ -151,6 +154,7 @@ public final class LingoTranspiler {
     }
 
     private func transpileHandler(name: String, args: [String], body: [Statement], isMethod: Bool, properties: Set<String>) -> String {
+        log?("Transpiling handler: \(name)")
         let previousProperties = activeProperties
         let previousHandlerIsInitializer = activeHandlerIsInitializer
         let isInitializer = isMethod && name.lowercased() == "new"
@@ -270,12 +274,15 @@ public final class LingoTranspiler {
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
         let maxCommentDepth = 8
         let commentedSource: String
-        if expressionDepth(of: statement) <= maxCommentDepth {
+        let depth = expressionDepth(of: statement)
+        log?("Statement depth: \(depth)")
+        if depth <= maxCommentDepth {
             commentedSource = statement.toLingoSource().split(separator: "\n", omittingEmptySubsequences: false)
                 .map { "\(indent)// \($0)" }.joined(separator: "\n")
         } else {
             commentedSource = "\(indent)// (complex expression omitted)"
         }
+        log?("Comment generated")
         var output = "\(commentedSource)\n"
         switch statement {
         case .global, .property:
