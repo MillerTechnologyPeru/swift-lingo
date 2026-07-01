@@ -43,7 +43,7 @@ struct PassAndParagraphTests {
             Issue.record("Expected put statement")
             return
         }
-        guard case .chunkExpression(let type, _, _, _) = value else {
+        guard case .chunkExpression(let type, _, _, _, _) = value else {
             Issue.record("Expected chunk expression, got \(value)")
             return
         }
