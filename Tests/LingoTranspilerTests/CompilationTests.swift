@@ -59,7 +59,21 @@ struct CompilationTests {
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
+        // `swift test` from the command line runs with the package root as the
+        // working directory, so a local path dependency finds the checkout
+        // directly. Xcode (and other IDEs) run tests with an unrelated working
+        // directory, so the same path lookup silently fails to find the
+        // SwiftLingo sources. Detect that case and fall back to fetching the
+        // package from GitHub instead.
         let swiftLingoPath = FileManager.default.currentDirectoryPath
+        let localManifest = URL(fileURLWithPath: swiftLingoPath).appendingPathComponent("Package.swift")
+        let isLocalSwiftLingoCheckout =
+            (try? String(contentsOf: localManifest, encoding: .utf8))?.contains("name: \"SwiftLingo\"") ?? false
+
+        let dependency =
+            isLocalSwiftLingoCheckout
+            ? ".package(name: \"SwiftLingo\", path: \"\(swiftLingoPath)\")"
+            : ".package(url: \"https://github.com/MillerTechnologyPeru/swift-lingo\", branch: \"main\")"
 
         let packageSwift = """
             // swift-tools-version: 6.3
@@ -68,7 +82,7 @@ struct CompilationTests {
             let package = Package(
                 name: "LingoCompileTest",
                 dependencies: [
-                    .package(name: "SwiftLingo", path: "\(swiftLingoPath)")
+                    \(dependency)
                 ],
                 targets: [
                     .target(
