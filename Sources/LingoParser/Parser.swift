@@ -169,12 +169,12 @@ public class Parser {
             guard let target = parseExpression() else { return nil }
 
             if case .binaryOperation(let left, let op, let right) = target, op == .equals {
-                return .assignment(target: left, value: right)
+                return .assignment(target: left, value: right, syntax: .verbose)
             }
 
             if match(.equals) || matchKeyword("to") {
                 if let value = parseExpression() {
-                    return .assignment(target: target, value: value)
+                    return .assignment(target: target, value: value, syntax: .verbose)
                 }
             }
         } else if matchKeyword("put") {
@@ -240,7 +240,7 @@ public class Parser {
             // Actually, parseScript loop handles newlines.
 
             if case .binaryOperation(let left, let op, let right) = expr, op == .equals {
-                return .assignment(target: left, value: right)
+                return .assignment(target: left, value: right, syntax: .dot)
             }
             return .expressionStatement(expr)
         }
@@ -615,7 +615,7 @@ public class Parser {
                                 baseExpr = .spriteProp(spriteId: spriteId, prop: prop)
                             }
                         } else if let target = parsePrimary() {
-                            baseExpr = .theProp(obj: target, prop: prop)
+                            baseExpr = .propertyAccess(target: target, property: prop, syntax: .verbose)
                         }
                     }
                     if baseExpr == nil {
@@ -771,8 +771,23 @@ public class Parser {
                         }
                         _ = match(.rightParen)
                         baseExpr = .functionCall(target: baseExpr, name: prop, arguments: args)
+                    } else if let chunkType = ChunkType(rawValue: prop.lowercased()), check(.leftBracket) {
+                        // Dot-syntax chunk access, e.g. `member(x).paragraph[1]` or
+                        // `s.char[1..5]` — equivalent to verbose `paragraph 1 of member(x)`.
+                        _ = match(.leftBracket)
+                        if let index = parseExpression() {
+                            if match(.range) {
+                                if let endIndex = parseExpression() {
+                                    _ = match(.rightBracket)
+                                    baseExpr = .chunkExpression(type: chunkType, first: index, last: endIndex, string: baseExpr!, syntax: .dot)
+                                }
+                            } else {
+                                _ = match(.rightBracket)
+                                baseExpr = .chunkExpression(type: chunkType, first: index, last: nil, string: baseExpr!, syntax: .dot)
+                            }
+                        }
                     } else {
-                        baseExpr = .propertyAccess(target: baseExpr!, property: prop)
+                        baseExpr = .propertyAccess(target: baseExpr!, property: prop, syntax: .dot)
                     }
                 }
             } else if match(.leftBracket) {
@@ -805,6 +820,6 @@ public class Parser {
         }
         if matchKeyword("of") || matchKeyword("in") {}
         guard let target = parsePrimary() else { return nil }
-        return .chunkExpression(type: type, first: index, last: last, string: target)
+        return .chunkExpression(type: type, first: index, last: last, string: target, syntax: .verbose)
     }
 }
