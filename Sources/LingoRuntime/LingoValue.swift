@@ -333,10 +333,10 @@ public enum LingoValue {
         let startIdx = start.asInteger() ?? 1
         let lowerBound = Swift.max(1, startIdx)
         let endIndex = end?.asInteger() ?? startIdx
-        
+
         var chunks = splitIntoChunks(string, type: type)
         let upperBound = Swift.max(lowerBound, endIndex)
-        
+
         if lowerBound > chunks.count {
             while chunks.count < lowerBound - 1 {
                 chunks.append("")
@@ -347,7 +347,7 @@ public enum LingoValue {
             let range = (lowerBound - 1)..<actualUpper
             chunks.replaceSubrange(range, with: [value.asString()])
         }
-        
+
         return .string(chunks.joined(separator: chunkJoiner(for: type)))
     }
 
