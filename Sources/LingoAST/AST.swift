@@ -10,7 +10,7 @@ public enum Statement: Equatable {
     case global(names: [String])
     case property(names: [String])
     case handler(name: String, arguments: [String], body: [Statement])
-    case assignment(target: Expression, value: Expression)
+    case assignment(target: Expression, value: Expression, syntax: LingoSyntax)
     case put(type: PutType, value: Expression, target: Expression?)
     case ifStatement(condition: Expression, body: [Statement], elseBody: [Statement]?)
     case repeatWithCounter(variable: String, start: Expression, end: Expression, body: [Statement], up: Bool)
@@ -51,9 +51,7 @@ public indirect enum Expression: Equatable {
 
     case identifier(String)
     case the(String)
-    case theProp(obj: Expression, prop: String)
-    case objProp(obj: Expression, prop: String)
-    case propertyAccess(target: Expression, property: String)  // object.property or the property of object
+    case propertyAccess(target: Expression, property: String, syntax: LingoSyntax)  // object.property or the property of object
     case elementAccess(target: Expression, index: Expression)  // array[index]
     case objPropIndex(obj: Expression, prop: String, index: Expression, index2: Expression?)
 
@@ -70,7 +68,7 @@ public indirect enum Expression: Equatable {
     case binaryOperation(left: Expression, operator: BinaryOperator, right: Expression)
     case unaryOperation(operator: UnaryOperator, operand: Expression)
 
-    case chunkExpression(type: ChunkType, first: Expression, last: Expression?, string: Expression)  // e.g. word 1 of Entry
+    case chunkExpression(type: ChunkType, first: Expression, last: Expression?, string: Expression, syntax: LingoSyntax)  // e.g. word 1 of Entry, or Entry.word[1]
     case elementRangeAccess(target: Expression, start: Expression, end: Expression)
     case lastStringChunk(type: ChunkType, obj: Expression)
     case stringChunkCount(type: ChunkType, obj: Expression)

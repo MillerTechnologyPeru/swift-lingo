@@ -216,7 +216,7 @@ public final class LingoTranspiler {
             switch stmt {
             case .global(let names):
                 for name in names { globals.insert(name.lowercased()) }
-            case .assignment(let target, _):
+            case .assignment(let target, _, _):
                 if case .identifier(let name) = target {
                     locals.insert(name.lowercased())
                 }
@@ -275,7 +275,7 @@ public final class LingoTranspiler {
             break
         case .handler:
             break
-        case .assignment(let target, let value):
+        case .assignment(let target, let value, _):
             let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
             if case .identifier(let name) = target {
                 let lower = name.lowercased()
@@ -288,7 +288,7 @@ public final class LingoTranspiler {
                 }
             } else if let memberProperty = transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
                 output += "\(indent)\(memberProperty)\n"
-            } else if case .propertyAccess(let obj, let prop) = target {
+            } else if case .propertyAccess(let obj, let prop, _) = target {
                 let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
                 output += "\(indent)\(objStr).setProperty(\"\(prop)\", value: \(valStr))\n"
             } else if case .elementAccess(let obj, let indexExpr) = target {
@@ -462,7 +462,7 @@ public final class LingoTranspiler {
 
     private func propertyChain(from expression: LingoAST.Expression) -> (base: LingoAST.Expression, properties: [String]) {
         switch expression {
-        case .propertyAccess(let target, let property):
+        case .propertyAccess(let target, let property, _):
             let chain = propertyChain(from: target)
             return (chain.base, chain.properties + [property])
         default:
@@ -489,15 +489,9 @@ public final class LingoTranspiler {
                 return "self.`\(name)`"
             }
             return "LingoEnvironment.shared.getGlobal(\"\(name)\")"
-        case .the(let prop), .theProp(.void, let prop):
+        case .the(let prop):
             return isMethod ? "self.`\(prop)`" : "LingoEnvironment.shared.getGlobal(\"\(prop)\")"
-        case .theProp(let obj, let prop):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            return "\(objStr).`\(prop)`"
-        case .objProp(let obj, let prop):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            return "\(objStr).`\(prop)`"
-        case .propertyAccess(let target, let prop):
+        case .propertyAccess(let target, let prop, _):
             let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
             return "\(tStr).`\(prop)`"
         case .functionCall(let target, let name, let args):
@@ -566,7 +560,7 @@ public final class LingoTranspiler {
                 return "\(objStr).`\(prop)`.getRange(start: \(indexStr), end: \(index2Str))"
             }
             return "\(objStr).`\(prop)`[\(indexStr)]"
-        case .chunkExpression(let type, let first, let last, let string):
+        case .chunkExpression(let type, let first, let last, let string, _):
             let stringStr = transpile(expression: string, locals: locals, isMethod: isMethod)
             let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
             let lastStr = last.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? "nil"

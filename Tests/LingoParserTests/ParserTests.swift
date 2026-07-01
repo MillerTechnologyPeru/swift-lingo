@@ -24,7 +24,7 @@ struct ParserTests {
             #expect(args == ["me"])
             #expect(body.count == 2)
 
-            if case .assignment(let target, let value) = body[0] {
+            if case .assignment(let target, let value, _) = body[0] {
                 #expect(target == .identifier("gameState"))
                 #expect(value == .symbol("PREGAME"))
             } else {
