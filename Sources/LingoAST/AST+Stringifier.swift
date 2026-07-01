@@ -1,3 +1,4 @@
+#if canImport(Foundation)
 import Foundation
 
 extension Script {
@@ -279,3 +280,4 @@ extension Expression {
         }
     }
 }
+#endif
