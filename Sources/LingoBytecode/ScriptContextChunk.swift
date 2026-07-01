@@ -46,8 +46,9 @@ public struct ScriptContextChunk: Equatable, Sendable {
 
     public static func read(from input: borrowing ParserSpan) throws(any Error) -> ScriptContextChunk {
         return try input.withUnsafeBytes { rawBuffer in
-            var headerSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                rebasing: rawBuffer[input.startPosition..<rawBuffer.count]))
+            var headerSpan = unsafe ParserSpan(
+                _unsafeBytes: UnsafeRawBufferPointer(
+                    rebasing: rawBuffer[input.startPosition..<rawBuffer.count]))
             let _ = try UInt32(parsingBigEndian: &headerSpan)
             let _ = try UInt32(parsingBigEndian: &headerSpan)
             let entryCount = try UInt32(parsingBigEndian: &headerSpan)
@@ -66,8 +67,9 @@ public struct ScriptContextChunk: Equatable, Sendable {
             guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
                 throw LingoBytecodeError.invalidOffset(entriesOffset)
             }
-            var entriesSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
+            var entriesSpan = unsafe ParserSpan(
+                _unsafeBytes: UnsafeRawBufferPointer(
+                    rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
 
             var sectionMap: [ScriptContextMapEntry] = []
             sectionMap.reserveCapacity(Int(entryCount))
