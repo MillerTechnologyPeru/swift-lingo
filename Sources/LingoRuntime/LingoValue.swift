@@ -328,6 +328,29 @@ public enum LingoValue {
         return .string(splitIntoChunks(string, type: type).last ?? "")
     }
 
+    public func settingChunk(_ type: String, start: LingoValue, end: LingoValue?, value: LingoValue) -> LingoValue {
+        let string = self.asString()
+        let startIdx = start.asInteger() ?? 1
+        let lowerBound = Swift.max(1, startIdx)
+        let endIndex = end?.asInteger() ?? startIdx
+        
+        var chunks = splitIntoChunks(string, type: type)
+        let upperBound = Swift.max(lowerBound, endIndex)
+        
+        if lowerBound > chunks.count {
+            while chunks.count < lowerBound - 1 {
+                chunks.append("")
+            }
+            chunks.append(value.asString())
+        } else {
+            let actualUpper = Swift.min(chunks.count, upperBound)
+            let range = (lowerBound - 1)..<actualUpper
+            chunks.replaceSubrange(range, with: [value.asString()])
+        }
+        
+        return .string(chunks.joined(separator: chunkJoiner(for: type)))
+    }
+
     public func chunkCount(_ type: String) -> LingoValue {
         guard case .string(let string) = self else { return .integer(0) }
         return .integer(splitIntoChunks(string, type: type).count)
