@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Subprocess
 @testable import LingoAST
 @testable import LingoParser
 @testable import LingoTranspiler
@@ -10,8 +11,33 @@ import Foundation
 struct CompilationTests {
 
     @Test
-    func testGeneratedSwiftCodeCompiles() throws {
+    func testGeneratedSwiftCodeCompiles() async throws {
         // Find the Lingo files
+        guard let resources = Bundle.module.url(forResource: "Resources", withExtension: nil) else {
+            Issue.record("Missing 'Resources' directory in test bundle")
+            return
+        }
+        let filesDirectory = resources.appendingPathComponent("files", isDirectory: true)
+
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: filesDirectory,
+                includingPropertiesForKeys: nil
+            )
+        else {
+            Issue.record("Could not enumerate files")
+            return
+        }
+
+        var lsFiles: [URL] = []
+        while let url = enumerator.nextObject() as? URL {
+            if url.pathExtension == "ls" {
+                lsFiles.append(url)
+            }
+        }
+
+        #expect(lsFiles.count > 0, "Should find at least some .ls files")
+
         // Use a simple sample script
         let sampleLingo = """
             on myHandler
@@ -72,28 +98,42 @@ struct CompilationTests {
             """
         try mainSwift.write(to: sourcesDir.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
 
-        // Run swift build
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["swift", "build"]
-        process.currentDirectoryURL = tempDir
+        // Transpile them and write to separate swift files
+        for file in lsFiles {
+            print("Transpiling \(file.lastPathComponent)...")
+            let content = try String(contentsOf: file, encoding: .macOSRoman)
+            var fileLexer = Lexer(input: content)
+            let fileTokens = fileLexer.tokenize()
+            let fileParser = Parser(tokens: fileTokens)
+            let fileScript = fileParser.parseScript()
+            let fileTranspiler = LingoTranspiler(script: fileScript, relativePath: file.lastPathComponent, originalPath: file.path)
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+            let fileGeneratedCode = "import LingoRuntime\n" + fileTranspiler.transpile()
 
-        try process.run()
-        process.waitUntilExit()
+            let swiftFileName = file.lastPathComponent.replacingOccurrences(of: ".ls", with: ".swift")
+            let fileUrl = sourcesDir.appendingPathComponent(swiftFileName)
+            try fileGeneratedCode.write(to: fileUrl, atomically: true, encoding: .utf8)
+        }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
+        // Run swift build in a bash context using Subprocess
+        let result = try await Subprocess.run(
+            .name("bash"),
+            arguments: ["-c", "swift build"],
+            workingDirectory: tempDir.path,
+            output: .string,
+            error: .string
+        )
 
-        if process.terminationStatus != 0 {
+        let output = result.standardOutput ?? ""
+        let errorOutput = result.standardError ?? ""
+
+        if !result.terminationStatus.isSuccess {
             print(output)
+            print(errorOutput)
             Issue.record("Generated Swift code failed to compile. See console for output.")
         }
 
-        #expect(process.terminationStatus == 0)
+        #expect(result.terminationStatus.isSuccess)
     }
 }
 #endif
