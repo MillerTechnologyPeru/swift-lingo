@@ -4,6 +4,7 @@ import LingoParser
 import LingoTranspiler
 
 @main
+@available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
 struct SwiftLingoCompiler: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swiftlingoc",
