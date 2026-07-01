@@ -71,11 +71,12 @@ struct CompilationTests {
                     .package(name: "SwiftLingo", path: "\(swiftLingoPath)")
                 ],
                 targets: [
-                    .executableTarget(
+                    .target(
                         name: "LingoCompileTest",
                         dependencies: [
                             .product(name: "LingoRuntime", package: "SwiftLingo")
-                        ]
+                        ],
+                        swiftSettings: [.swiftLanguageMode(.v5)]
                     )
                 ]
             )
@@ -85,21 +86,13 @@ struct CompilationTests {
         let sourcesDir = tempDir.appendingPathComponent("Sources").appendingPathComponent("LingoCompileTest")
         try FileManager.default.createDirectory(at: sourcesDir, withIntermediateDirectories: true)
 
-        let mainSwift = """
+        // Write inline test as a regular source file (not main.swift to avoid top-level code issues)
+        let inlineSwift = """
             import LingoRuntime
 
             \(generatedCode)
-
-            @main
-            struct App {
-                static func main() {
-                    // Do nothing
-                }
-            }
             """
-        let mainSwiftURL = sourcesDir.appendingPathComponent("main.swift")
-        try mainSwift.write(to: sourcesDir.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
-        print("Wrote to \(mainSwiftURL.path())")
+        try inlineSwift.write(to: sourcesDir.appendingPathComponent("InlineTest.swift"), atomically: true, encoding: .utf8)
 
         // Transpile them and write to separate swift files
         for file in lsFiles {
