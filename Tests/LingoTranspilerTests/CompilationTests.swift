@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import Subprocess
+import SystemPackage
 @testable import LingoAST
 @testable import LingoParser
 @testable import LingoTranspiler
@@ -119,9 +120,9 @@ struct CompilationTests {
         let result = try await Subprocess.run(
             .name("bash"),
             arguments: ["-c", "swift build"],
-            workingDirectory: tempDir.path,
-            output: .string,
-            error: .string
+            workingDirectory: FilePath(tempDir.path),
+            output: .string(limit: 8 * 1024 * 1024),
+            error: .string(limit: 8 * 1024 * 1024)
         )
 
         let output = result.standardOutput ?? ""
