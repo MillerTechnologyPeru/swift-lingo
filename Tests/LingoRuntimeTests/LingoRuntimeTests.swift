@@ -7,14 +7,14 @@ import Testing
 struct StringExtensionTests {
 
     // MARK: asciiLowercased
-    
+
     @Test func testAsciiLowercased() {
-        #expect("hello".asciiLowercased() == "hello") // Fast path
-        #expect("HELLO".asciiLowercased() == "hello") // Slow path
-        #expect("Hello World!".asciiLowercased() == "hello world!") // Mixed case
-        #expect("".asciiLowercased() == "") // Empty
-        #expect("123 @#$".asciiLowercased() == "123 @#$") // Symbols
-        #expect("Café".asciiLowercased() == "café") // Non-ascii passes through
+        #expect("hello".asciiLowercased() == "hello")  // Fast path
+        #expect("HELLO".asciiLowercased() == "hello")  // Slow path
+        #expect("Hello World!".asciiLowercased() == "hello world!")  // Mixed case
+        #expect("".asciiLowercased() == "")  // Empty
+        #expect("123 @#$".asciiLowercased() == "123 @#$")  // Symbols
+        #expect("Café".asciiLowercased() == "café")  // Non-ascii passes through
     }
 
     // MARK: caseInsensitiveEquals
