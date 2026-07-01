@@ -135,7 +135,7 @@ Add `LingoTranspilerPlugin` to any target that contains `.ls` files and the tran
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/MillerTechnologyPeru/swift-lingo", branch: "main"),
+.package(url: "https://github.com/MillerTechnologyPeru/swift-lingo", branch: "master"),
 ```
 
 Available products: `LingoRuntime`, `LingoAST`, `LingoParser`, `LingoTranspiler`, `LingoTranspilerPlugin`, `swiftlingoc`.

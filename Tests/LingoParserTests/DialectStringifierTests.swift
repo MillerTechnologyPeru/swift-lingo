@@ -137,7 +137,7 @@ struct DialectStringifierTests {
     // MARK: - `toLingoSource()` with no argument reproduces the original dialect exactly
 
     @Test
-    func defaultRenderingReproducesEachStatementsOriginalDialect() {
+    func defaultRenderingReproducesEachStatementsOriginalDialect() async {
         let script = parse(
             """
             on test me
@@ -145,57 +145,59 @@ struct DialectStringifierTests {
               member("y").crop = FALSE
             end
             """)
-        let source = script.toLingoSource()
+        let source = await script.toLingoSource()
         #expect(source.contains("set the crop of member(\"x\") to TRUE"))
         #expect(source.contains("member(\"y\").crop = FALSE"))
     }
 
     @Test
-    func defaultRenderingReproducesDotChunkAccessVerbatim() {
+    func defaultRenderingReproducesDotChunkAccessVerbatim() async {
         guard case .expressionStatement = statement(from: "s.char[n]") else {
             Issue.record("Expected expression statement")
             return
         }
         let script = parse("on test me\n  s.char[n]\nend")
-        #expect(script.toLingoSource().contains("s.char[n]"))
+        let source = await script.toLingoSource()
+        #expect(source.contains("s.char[n]"))
     }
 
     // MARK: - Forcing a dialect normalizes the whole subtree, including nested chunks
 
     @Test
-    func forcingDotNormalizesVerboseNestedChunk() throws {
+    func forcingDotNormalizesVerboseNestedChunk() async throws {
         let script = parse(
             """
             on test me
               word 2 of paragraph 1 of member("News Items")
             end
             """)
-        let dotSource = script.toLingoSource(syntax: .dot)
+        let dotSource = await script.toLingoSource(syntax: .dot)
         #expect(dotSource.contains(#"member("News Items").paragraph[1].word[2]"#))
 
         // Re-parsing the normalized text should itself round-trip when re-forced to dot.
         let reparsed = parse(dotSource)
-        #expect(reparsed.toLingoSource(syntax: .dot) == dotSource)
+        let reparsedDotSource = await reparsed.toLingoSource(syntax: .dot)
+        #expect(reparsedDotSource == dotSource)
     }
 
     @Test
-    func forcingVerboseNormalizesDotChunkAccess() {
+    func forcingVerboseNormalizesDotChunkAccess() async {
         let script = parse("on test me\n  member(\"News Items\").paragraph[1].word[2]\nend")
-        let verboseSource = script.toLingoSource(syntax: .verbose)
+        let verboseSource = await script.toLingoSource(syntax: .verbose)
         #expect(verboseSource.contains(#"word 2 of paragraph 1 of member("News Items")"#))
     }
 
     @Test
-    func forcingDotNormalizesVerboseAssignment() {
+    func forcingDotNormalizesVerboseAssignment() async {
         let script = parse("on test me\n  set the crop of member(\"x\") to TRUE\nend")
-        let dotSource = script.toLingoSource(syntax: .dot)
+        let dotSource = await script.toLingoSource(syntax: .dot)
         #expect(dotSource.contains(#"member("x").crop = TRUE"#))
     }
 
     @Test
-    func forcingVerboseNormalizesDotAssignment() {
+    func forcingVerboseNormalizesDotAssignment() async {
         let script = parse("on test me\n  member(\"x\").crop = TRUE\nend")
-        let verboseSource = script.toLingoSource(syntax: .verbose)
+        let verboseSource = await script.toLingoSource(syntax: .verbose)
         #expect(verboseSource.contains(#"set the crop of member("x") to TRUE"#))
     }
 }

@@ -4,6 +4,11 @@ import LingoParser
 
 public final class LingoTranspiler {
 
+    /// Optional logger. When set, the transpiler calls this with diagnostic messages.
+    public var log: ((String) -> Void)?
+    public var maxDepth: UInt = 500
+    public var maxCommentDepth: UInt = 500
+
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
     private var script: Script
@@ -16,7 +21,10 @@ public final class LingoTranspiler {
         self.originalPath = originalPath
     }
 
-    public func transpile() -> String {
+    /// `async` so recursion over expression/statement trees runs on the
+    /// task's heap-allocated frame allocator instead of the thread's
+    /// fixed-size stack, which avoids overflow on deeply nested ASTs.
+    public func transpile() async -> String {
         let pathComponents = originalPath.split(separator: "/")
         let shortPath = pathComponents.count >= 2 ? pathComponents.suffix(2).joined(separator: "/") : originalPath
         var output = "// Transpiled from \(shortPath)\n"
@@ -102,7 +110,7 @@ public final class LingoTranspiler {
             let propertyNames = Set(properties.map { $0.lowercased() })
             for stmt in script.statements {
                 if case .handler(let name, let arguments, let body) = stmt {
-                    output += transpileHandler(name: name, args: arguments, body: body, isMethod: true, properties: propertyNames)
+                    output += await transpileHandler(name: name, args: arguments, body: body, isMethod: true, properties: propertyNames)
                 }
             }
 
@@ -110,7 +118,7 @@ public final class LingoTranspiler {
         } else {
             for stmt in script.statements {
                 if case .handler(let name, let arguments, let body) = stmt {
-                    output += transpileHandler(name: name, args: arguments, body: body, isMethod: false, properties: [])
+                    output += await transpileHandler(name: name, args: arguments, body: body, isMethod: false, properties: [])
                 }
             }
         }
@@ -150,7 +158,8 @@ public final class LingoTranspiler {
         return output
     }
 
-    private func transpileHandler(name: String, args: [String], body: [Statement], isMethod: Bool, properties: Set<String>) -> String {
+    private func transpileHandler(name: String, args: [String], body: [Statement], isMethod: Bool, properties: Set<String>) async -> String {
+        log?("Transpiling handler: \(name)")
         let previousProperties = activeProperties
         let previousHandlerIsInitializer = activeHandlerIsInitializer
         let isInitializer = isMethod && name.lowercased() == "new"
@@ -196,7 +205,7 @@ public final class LingoTranspiler {
         if !hoisted.isEmpty || args.count > (args.contains { $0.lowercased() == "me" } ? 1 : 0) { output += "\n" }
 
         for stmt in body {
-            output += transpile(statement: stmt, indent: indent, locals: locals, isMethod: isMethod)
+            output += await transpile(statement: stmt, indent: indent, locals: locals, isMethod: isMethod)
         }
 
         if !isInitializer {
@@ -267,8 +276,18 @@ public final class LingoTranspiler {
         }
     }
 
-    private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
-        let commentedSource = statement.toLingoSource().split(separator: "\n", omittingEmptySubsequences: false).map { "\(indent)// \($0)" }.joined(separator: "\n")
+    private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) async -> String {
+        let commentedSource: String
+        let depth = expressionDepth(of: statement)
+        log?("Statement depth: \(depth)")
+        if depth <= maxCommentDepth {
+            let source = await statement.toLingoSource()
+            commentedSource = source.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "\(indent)// \($0)" }.joined(separator: "\n")
+        } else {
+            commentedSource = "\(indent)// (complex expression omitted)"
+        }
+        log?("Comment generated")
         var output = "\(commentedSource)\n"
         switch statement {
         case .global, .property:
@@ -276,64 +295,64 @@ public final class LingoTranspiler {
         case .handler:
             break
         case .assignment(let target, let value, _):
-            let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
-            output += transpileAssignment(target: target, valStr: valStr, indent: indent, locals: locals, isMethod: isMethod)
+            let valStr = await transpile(expression: value, locals: locals, isMethod: isMethod)
+            output += await transpileAssignment(target: target, valStr: valStr, indent: indent, locals: locals, isMethod: isMethod)
         case .put(_, let value, let target):
-            let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
+            let valStr = await transpile(expression: value, locals: locals, isMethod: isMethod)
             if let t = target {
-                output += transpileAssignment(target: t, valStr: valStr, indent: indent, locals: locals, isMethod: isMethod)
+                output += await transpileAssignment(target: t, valStr: valStr, indent: indent, locals: locals, isMethod: isMethod)
             }
         case .ifStatement(let cond, let body, let elseBody):
-            let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
+            let condStr = await transpile(expression: cond, locals: locals, isMethod: isMethod)
             output += "\(indent)if (\(condStr) as LingoValue).asBool() {\n"
             for stmt in body {
-                output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
             if let elseBody = elseBody, !elseBody.isEmpty {
                 output += "\(indent)} else {\n"
                 for stmt in elseBody {
-                    output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                    output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
                 }
             }
             output += "\(indent)}\n"
         case .repeatWithCounter(let variable, let start, let end, let body, let up):
-            let startStr = transpile(expression: start, locals: locals, isMethod: isMethod)
-            let endStr = transpile(expression: end, locals: locals, isMethod: isMethod)
+            let startStr = await transpile(expression: start, locals: locals, isMethod: isMethod)
+            let endStr = await transpile(expression: end, locals: locals, isMethod: isMethod)
             output += "\(indent)`\(variable.lowercased())` = \(startStr)\n"
             let op = up ? "<=" : ">="
             let inc = up ? "+" : "-"
             output += "\(indent)while ((`\(variable.lowercased())` \(op) \(endStr)) as LingoValue).asBool() {\n"
             for stmt in body {
-                output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
             output += "\(indent)    `\(variable.lowercased())` = `\(variable.lowercased())` \(inc) .integer(1)\n"
             output += "\(indent)}\n"
         case .repeatWhile(let cond, let body):
-            let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
+            let condStr = await transpile(expression: cond, locals: locals, isMethod: isMethod)
             output += "\(indent)while (\(condStr) as LingoValue).asBool() {\n"
             for stmt in body {
-                output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
             output += "\(indent)}\n"
         case .repeatWithIn(let variable, let list, let body):
-            let listStr = transpile(expression: list, locals: locals, isMethod: isMethod)
+            let listStr = await transpile(expression: list, locals: locals, isMethod: isMethod)
             output += "\(indent)for lingoItem in \(listStr).asSequence() {\n"
             output += "\(indent)    `\(variable.lowercased())` = lingoItem\n"
             for stmt in body {
-                output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
             output += "\(indent)}\n"
         case .expressionStatement(let expr):
-            let exprStr = transpile(expression: expr, locals: locals, isMethod: isMethod)
+            let exprStr = await transpile(expression: expr, locals: locals, isMethod: isMethod)
             output += "\(indent)let _: LingoValue = \(exprStr)\n"
         case .returnStatement(let expr):
             if activeHandlerIsInitializer {
                 if let expr, !expr.isMeReference {
-                    let exprStr = transpile(expression: expr, locals: locals, isMethod: isMethod)
+                    let exprStr = await transpile(expression: expr, locals: locals, isMethod: isMethod)
                     output += "\(indent)_ = \(exprStr)\n"
                 }
             } else if let expr = expr {
-                let exprStr = transpile(expression: expr, locals: locals, isMethod: isMethod)
+                let exprStr = await transpile(expression: expr, locals: locals, isMethod: isMethod)
                 output += "\(indent)return \(exprStr)\n"
             } else {
                 output += "\(indent)return .void\n"
@@ -350,89 +369,116 @@ public final class LingoTranspiler {
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"pass\", args: [])\n"
             output += activeHandlerIsInitializer ? "\(indent)return\n" : "\(indent)return .void\n"
         case .caseStatement(let cond, let cases, let otherwise):
-            let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
+            let condStr = await transpile(expression: cond, locals: locals, isMethod: isMethod)
             output += "\(indent)switch \(condStr) {\n"
             for c in cases {
-                let caseVals = c.values.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
+                var caseVals = ""
+                for (i, value) in c.values.enumerated() {
+                    if i > 0 { caseVals += ", " }
+                    caseVals += await transpile(expression: value, locals: locals, isMethod: isMethod)
+                }
                 output += "\(indent)case \(caseVals):\n"
                 if c.body.isEmpty {
                     output += "\(indent)    break\n"
                 } else {
                     for stmt in c.body {
-                        output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                        output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
                     }
                 }
             }
             output += "\(indent)default:\n"
             if let otherwise = otherwise {
                 for stmt in otherwise {
-                    output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                    output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
                 }
             } else {
                 output += "\(indent)    break\n"
             }
             output += "\(indent)}\n"
         case .tell(let window, let body):
-            let windowStr = transpile(expression: window, locals: locals, isMethod: isMethod)
+            let windowStr = await transpile(expression: window, locals: locals, isMethod: isMethod)
             output += "\(indent)_ = \(windowStr)\n"
             output += "\(indent)do {\n"
             for stmt in body {
-                output += transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
+                output += await transpile(statement: stmt, indent: indent + "    ", locals: locals, isMethod: isMethod)
             }
             output += "\(indent)}\n"
         case .when(let event, let script):
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"when\", args: [.string(\"\(escapeSwiftString(event))\"), .string(\"\(escapeSwiftString(script))\")])\n"
         case .soundCmd(let cmd, let args):
-            let argsStr = args.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? ".void"
+            let argsStr: String
+            if let args {
+                argsStr = await transpile(expression: args, locals: locals, isMethod: isMethod)
+            } else {
+                argsStr = ".void"
+            }
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"\(escapeSwiftString(cmd))\", args: [\(argsStr)])\n"
         case .playCmd(let args):
-            let argsStr = args.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? ".void"
+            let argsStr: String
+            if let args {
+                argsStr = await transpile(expression: args, locals: locals, isMethod: isMethod)
+            } else {
+                argsStr = ".void"
+            }
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"play\", args: [\(argsStr)])\n"
         case .chunkHilite(let chunk):
-            let chunkStr = transpile(expression: chunk, locals: locals, isMethod: isMethod)
+            let chunkStr = await transpile(expression: chunk, locals: locals, isMethod: isMethod)
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"hilite\", args: [\(chunkStr)])\n"
         case .chunkDelete(let chunk):
-            let chunkStr = transpile(expression: chunk, locals: locals, isMethod: isMethod)
+            let chunkStr = await transpile(expression: chunk, locals: locals, isMethod: isMethod)
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"delete\", args: [\(chunkStr)])\n"
         }
         return output
     }
 
-    private func transpileAssignment(target: LingoAST.Expression, valStr: String, indent: String, locals: Set<String>, isMethod: Bool) -> String {
+    private func transpileAssignment(target: LingoAST.Expression, valStr: String, indent: String, locals: Set<String>, isMethod: Bool) async -> String {
         var output = ""
         if case .identifier(let name) = target {
             let lower = name.lowercased()
-            if locals.contains(lower) {
+            if lower == "me" {
+                // `me` is the object reference (`self`), not a reassignable
+                // variable; a script that assigns into it directly (or into
+                // a chunk of it, e.g. `me.char[n] = ...`) can't be mutated
+                // that way, so evaluate the right-hand side for any side
+                // effects and discard the result.
+                output += "\(indent)_ = \(valStr)\n"
+            } else if locals.contains(lower) {
                 output += "\(indent)`\(lower)` = \(valStr)\n"
             } else if isMethod && activeProperties.contains(lower) {
                 output += "\(indent)self.`\(name)` = \(valStr)\n"
             } else {
                 output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
             }
-        } else if let memberProperty = transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
+        } else if let memberProperty = await transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
             output += "\(indent)\(memberProperty)\n"
         } else if case .propertyAccess(let obj, let prop, _) = target {
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod)
             output += "\(indent)\(objStr).setProperty(\"\(prop)\", value: \(valStr))\n"
         } else if case .elementAccess(let obj, let indexExpr) = target {
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            let idxStr = transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
+            let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let idxStr = await transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
             output += "\(indent)\(objStr).setElement(index: \(idxStr), value: \(valStr))\n"
         } else if case .the(let name) = target {
             output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
         } else if case .chunkExpression(let type, let first, let last, let string, _) = target {
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let lastStr = last.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? "nil"
-            let newStringValue = "(\(transpile(expression: string, locals: locals, isMethod: isMethod))).settingChunk(\"\(type.lingoName)\", start: \(firstStr), end: \(lastStr), value: \(valStr))"
-            output += transpileAssignment(target: string, valStr: newStringValue, indent: indent, locals: locals, isMethod: isMethod)
+            let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod)
+            let lastStr: String
+            if let last {
+                lastStr = await transpile(expression: last, locals: locals, isMethod: isMethod)
+            } else {
+                lastStr = "nil"
+            }
+            let stringStr = await transpile(expression: string, locals: locals, isMethod: isMethod)
+            let newStringValue = "(\(stringStr)).settingChunk(\"\(type.lingoName)\", start: \(firstStr), end: \(lastStr), value: \(valStr))"
+            output += await transpileAssignment(target: string, valStr: newStringValue, indent: indent, locals: locals, isMethod: isMethod)
         } else {
-            let targetStr = transpile(expression: target, locals: locals, isMethod: isMethod)
+            let targetStr = await transpile(expression: target, locals: locals, isMethod: isMethod)
             output += "\(indent)\(targetStr) = \(valStr)\n"
         }
         return output
     }
 
-    private func transpileMemberSpritePropertyAssignment(target: LingoAST.Expression, value: String, locals: Set<String>, isMethod: Bool) -> String? {
+    private func transpileMemberSpritePropertyAssignment(target: LingoAST.Expression, value: String, locals: Set<String>, isMethod: Bool) async -> String? {
         guard case .member(let type, let id, nil) = target,
             type.lowercased() == "member" || type.lowercased() == "sprite"
         else { return nil }
@@ -467,7 +513,8 @@ public final class LingoTranspiler {
         }
     }
 
-    func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
+    func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool, depth: Int = 0) async -> String {
+        guard depth < maxDepth else { return ".void /* expression depth limit exceeded */" }
         switch expression {
         case .void: return "LingoValue.void"
         case .integer(let v): return "LingoValue.integer(\(v))"
@@ -489,13 +536,17 @@ public final class LingoTranspiler {
         case .the(let prop):
             return isMethod ? "self.`\(prop)`" : "LingoEnvironment.shared.getGlobal(\"\(prop)\")"
         case .propertyAccess(let target, let prop, _):
-            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
+            let tStr = await transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr).`\(prop)`"
         case .functionCall(let target, let name, let args):
             let lingoArgs = args.filter { !$0.isMeReference }
-            let argStr = lingoArgs.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
+            var argStr = ""
+            for (i, arg) in lingoArgs.enumerated() {
+                if i > 0 { argStr += ", " }
+                argStr += await transpile(expression: arg, locals: locals, isMethod: isMethod, depth: depth + 1)
+            }
             if let t = target {
-                let tStr = t.isMeReference ? "self" : transpile(expression: t, locals: locals, isMethod: isMethod)
+                let tStr = t.isMeReference ? "self" : await transpile(expression: t, locals: locals, isMethod: isMethod, depth: depth + 1)
                 return "\(tStr).`\(name)`(\(argStr))"
             } else {
                 if locals.contains(name.lowercased()) {
@@ -505,100 +556,128 @@ public final class LingoTranspiler {
                 }
             }
         case .call(let name, let argExpr), .objCall(let name, let argExpr):
-            let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod)
+            let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
             return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
         case .objCallV4(let obj, let argExpr):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod)
+            let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(objStr)(\(argStr))"
-        case .binaryOperation(let left, let op, let right):
-            let l = transpile(expression: left, locals: locals, isMethod: isMethod)
-            let r = transpile(expression: right, locals: locals, isMethod: isMethod)
-            switch op {
-            case .equals: return "(\(l) == \(r))"
-            case .notEquals: return "(\(l) != \(r))"
-            case .logicalAnd: return "((\(l)).asBool() && (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
-            case .logicalOr: return "((\(l)).asBool() || (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
-            case .stringConcat: return "\(l).concat(\(r))"
-            case .stringConcatSpace: return "\(l).concatSpace(\(r))"
-            case .modulo: return "(\(l) % \(r))"
-            case .contains: return "\(l).contains(\(r))"
-            case .starts: return "\(l).starts(with: \(r))"
-            default: return "(\(l) \(op.rawValue) \(r))"
+        case .binaryOperation:
+            // Unroll the left-leaning chain iteratively to avoid stack overflow
+            // on deeply nested expressions (e.g. 60+ chained & concatenations).
+            typealias Rhs = (op: LingoAST.BinaryOperator, expr: LingoAST.Expression)
+            var rhsTerms: [Rhs] = []
+            var current = expression
+            while case .binaryOperation(let left, let op, let right) = current {
+                rhsTerms.append((op: op, expr: right))
+                current = left
             }
+            rhsTerms.reverse()
+            var result = await transpile(expression: current, locals: locals, isMethod: isMethod, depth: depth + 1)
+            for (op, rExpr) in rhsTerms {
+                let r = await transpile(expression: rExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
+                switch op {
+                case .equals: result = "(\(result) == \(r))"
+                case .notEquals: result = "(\(result) != \(r))"
+                case .logicalAnd:
+                    result = "((\(result)).asBool() && (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
+                case .logicalOr:
+                    result = "((\(result)).asBool() || (\(r)).asBool() ? LingoValue.integer(1) : LingoValue.integer(0))"
+                case .stringConcat: result = "\(result).concat(\(r))"
+                case .stringConcatSpace: result = "\(result).concatSpace(\(r))"
+                case .modulo: result = "(\(result) % \(r))"
+                case .contains: result = "\(result).contains(\(r))"
+                case .starts: result = "\(result).starts(with: \(r))"
+                default: result = "(\(result) \(op.rawValue) \(r))"
+                }
+            }
+            return result
         case .unaryOperation(let op, let operand):
-            let opr = transpile(expression: operand, locals: locals, isMethod: isMethod)
+            let opr = await transpile(expression: operand, locals: locals, isMethod: isMethod, depth: depth + 1)
             if op == .not {
                 return "((\(opr)).asBool() ? LingoValue.integer(0) : LingoValue.integer(1))"
             }
             return "(\(op.rawValue)\(opr))"
         case .list(let items):
-            let itemsStr = items.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
+            var itemsStr = ""
+            for (i, item) in items.enumerated() {
+                if i > 0 { itemsStr += ", " }
+                itemsStr += await transpile(expression: item, locals: locals, isMethod: isMethod, depth: depth + 1)
+            }
             return "LingoValue.list([\(itemsStr)])"
         case .propertyList(let entries):
-            let entriesStr = entries.map {
-                "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod)))"
-            }.joined(separator: ", ")
+            var entriesStr = ""
+            for (i, entry) in entries.enumerated() {
+                if i > 0 { entriesStr += ", " }
+                let keyStr = await transpile(expression: entry.key, locals: locals, isMethod: isMethod, depth: depth + 1)
+                let valueStr = await transpile(expression: entry.value, locals: locals, isMethod: isMethod, depth: depth + 1)
+                entriesStr += "(key: \(keyStr), value: \(valueStr))"
+            }
             return "LingoValue.propertyList([\(entriesStr)])"
         case .elementAccess(let target, let index):
-            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
-            let iStr = transpile(expression: index, locals: locals, isMethod: isMethod)
+            let tStr = await transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let iStr = await transpile(expression: index, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr)[\(iStr)]"
         case .elementRangeAccess(let target, let start, let end):
-            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
-            let sStr = transpile(expression: start, locals: locals, isMethod: isMethod)
-            let eStr = transpile(expression: end, locals: locals, isMethod: isMethod)
+            let tStr = await transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let sStr = await transpile(expression: start, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let eStr = await transpile(expression: end, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr).getRange(start: \(sStr), end: \(eStr))"
         case .objPropIndex(let obj, let prop, let index, let index2):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            let indexStr = transpile(expression: index, locals: locals, isMethod: isMethod)
+            let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let indexStr = await transpile(expression: index, locals: locals, isMethod: isMethod, depth: depth + 1)
             if let index2 {
-                let index2Str = transpile(expression: index2, locals: locals, isMethod: isMethod)
+                let index2Str = await transpile(expression: index2, locals: locals, isMethod: isMethod, depth: depth + 1)
                 return "\(objStr).`\(prop)`.getRange(start: \(indexStr), end: \(index2Str))"
             }
             return "\(objStr).`\(prop)`[\(indexStr)]"
         case .chunkExpression(let type, let first, let last, let string, _):
-            let stringStr = transpile(expression: string, locals: locals, isMethod: isMethod)
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let lastStr = last.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? "nil"
+            let stringStr = await transpile(expression: string, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let lastStr: String
+            if let last {
+                lastStr = await transpile(expression: last, locals: locals, isMethod: isMethod, depth: depth + 1)
+            } else {
+                lastStr = "nil"
+            }
             return "\(stringStr).chunk(\"\(type.lingoName)\", start: \(firstStr), end: \(lastStr))"
         case .lastStringChunk(let type, let obj):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(objStr).lastChunk(\"\(type.lingoName)\")"
         case .stringChunkCount(let type, let obj):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(objStr).chunkCount(\"\(type.lingoName)\")"
         case .spriteIntersects(let first, let second):
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let secondStr = transpile(expression: second, locals: locals, isMethod: isMethod)
+            let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let secondStr = await transpile(expression: second, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"intersects\", args: [\(firstStr), \(secondStr)])"
         case .spriteWithin(let first, let second):
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let secondStr = transpile(expression: second, locals: locals, isMethod: isMethod)
+            let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let secondStr = await transpile(expression: second, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"within\", args: [\(firstStr), \(secondStr)])"
         case .menuProp(let menuId, let prop):
-            let menuStr = transpile(expression: menuId, locals: locals, isMethod: isMethod)
+            let menuStr = await transpile(expression: menuId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"menu\", args: [\(menuStr)]).`\(prop)`"
         case .menuItemProp(let menuId, let itemId, let prop):
-            let menuStr = transpile(expression: menuId, locals: locals, isMethod: isMethod)
-            let itemStr = transpile(expression: itemId, locals: locals, isMethod: isMethod)
+            let menuStr = await transpile(expression: menuId, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let itemStr = await transpile(expression: itemId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"menuItem\", args: [\(itemStr), \(menuStr)]).`\(prop)`"
         case .soundProp(let soundId, let prop):
-            let soundStr = transpile(expression: soundId, locals: locals, isMethod: isMethod)
+            let soundStr = await transpile(expression: soundId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"sound\", args: [\(soundStr)]).`\(prop)`"
         case .spriteProp(let spriteId, let prop):
-            let spriteStr = transpile(expression: spriteId, locals: locals, isMethod: isMethod)
+            let spriteStr = await transpile(expression: spriteId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"sprite\", args: [\(spriteStr)]).`\(prop)`"
         case .member(let type, let id, _):
-            let idStr = transpile(expression: id, locals: locals, isMethod: isMethod)
+            let idStr = await transpile(expression: id, locals: locals, isMethod: isMethod, depth: depth + 1)
             let functionName = type.lowercased() == "sprite" ? "sprite" : "member"
             return isMethod ? "self.`\(functionName)`(\(idStr))" : "LingoEnvironment.shared.callGlobal(\"\(functionName)\", args: [\(idStr)])"
         case .newObj(let type, let args):
-            let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod)
+            let argsStr = await transpile(expression: args, locals: locals, isMethod: isMethod, depth: depth + 1)
             return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
         case .range(let start, let end):
-            let s = transpile(expression: start, locals: locals, isMethod: isMethod)
-            let e = transpile(expression: end, locals: locals, isMethod: isMethod)
+            let s = await transpile(expression: start, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let e = await transpile(expression: end, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoRange(\(s), \(e))"
         default:
             return ".void /* Unsupported expression: \(expression) */"
@@ -609,6 +688,36 @@ public final class LingoTranspiler {
         let name = relativePath.replacingOccurrences(of: ".ls", with: "")
         let components = name.split { !$0.isLetter && !$0.isNumber }
         return components.map { $0.prefix(1).uppercased() + String($0.dropFirst()).lowercased() }.joined()
+    }
+
+    /// Returns the maximum nesting depth of expressions within a statement,
+    /// capped at `limit` to avoid spending time on deeply recursive trees.
+    private func expressionDepth(of statement: Statement, limit: Int = 9) -> Int {
+        switch statement {
+        case .returnStatement(let e):
+            return e.map { expressionDepth(of: $0, limit: limit) } ?? 0
+        case .assignment(let t, let v, _):
+            return max(expressionDepth(of: t, limit: limit), expressionDepth(of: v, limit: limit))
+        case .put(_, let v, let t):
+            let td = t.map { expressionDepth(of: $0, limit: limit) } ?? 0
+            return max(expressionDepth(of: v, limit: limit), td)
+        default:
+            return 0
+        }
+    }
+
+    private func expressionDepth(of expr: LingoAST.Expression, limit: Int = 9) -> Int {
+        guard limit > 0 else { return limit }
+        switch expr {
+        case .binaryOperation(let l, _, let r):
+            let ld = expressionDepth(of: l, limit: limit - 1)
+            if ld >= limit { return limit }
+            return max(ld, expressionDepth(of: r, limit: limit - 1)) + 1
+        case .unaryOperation(_, let o):
+            return expressionDepth(of: o, limit: limit - 1) + 1
+        default:
+            return 1
+        }
     }
 
     private func escapeSwiftString(_ value: String) -> String {

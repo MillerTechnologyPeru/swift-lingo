@@ -4,7 +4,7 @@ import LingoParser
 import LingoTranspiler
 
 @main
-struct SwiftLingoCompiler: ParsableCommand {
+struct SwiftLingoCompiler: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swiftlingoc",
         abstract: "A transpiler that converts Adobe Director Lingo (.ls) scripts into Swift source code."
@@ -16,7 +16,7 @@ struct SwiftLingoCompiler: ParsableCommand {
     @Argument(help: "The output directory where .swift files will be generated.")
     var outputDir: String
 
-    mutating func run() throws {
+    mutating func run() async throws {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
 
@@ -25,22 +25,8 @@ struct SwiftLingoCompiler: ParsableCommand {
             throw ExitCode.failure
         }
 
-        var inputFiles: [URL] = []
         let inputURL = URL(fileURLWithPath: inputPath)
-
-        if isDir.boolValue {
-            if let enumerator = fileManager.enumerator(at: inputURL, includingPropertiesForKeys: nil) {
-                for case let fileURL as URL in enumerator {
-                    if fileURL.pathExtension == "ls" {
-                        inputFiles.append(fileURL)
-                    }
-                }
-            }
-        } else {
-            if inputURL.pathExtension == "ls" {
-                inputFiles.append(inputURL)
-            }
-        }
+        let inputFiles = Self.collectLingoFiles(at: inputURL, isDirectory: isDir.boolValue)
 
         guard !inputFiles.isEmpty else {
             print("No .ls files found to transpile.")
@@ -76,7 +62,7 @@ struct SwiftLingoCompiler: ParsableCommand {
                     relativePath: relativePath,
                     originalPath: file.path
                 )
-                let transpiledCode = transpiler.transpile()
+                let transpiledCode = await transpiler.transpile()
 
                 let disambiguatedName = relativePath.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ".ls", with: ".swift")
                 let outputFile = outputURL.appendingPathComponent(disambiguatedName)
@@ -93,5 +79,19 @@ struct SwiftLingoCompiler: ParsableCommand {
         if errorCount > 0 {
             throw ExitCode.failure
         }
+    }
+
+    private static func collectLingoFiles(at inputURL: URL, isDirectory: Bool) -> [URL] {
+        guard isDirectory else {
+            return inputURL.pathExtension == "ls" ? [inputURL] : []
+        }
+        guard let enumerator = FileManager.default.enumerator(at: inputURL, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        var inputFiles: [URL] = []
+        for case let fileURL as URL in enumerator where fileURL.pathExtension == "ls" {
+            inputFiles.append(fileURL)
+        }
+        return inputFiles
     }
 }
