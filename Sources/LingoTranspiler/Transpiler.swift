@@ -172,7 +172,7 @@ public final class LingoTranspiler {
         var mutatedVars = Set<String>()
         var globals = Set<String>()
         collectVariables(in: body, locals: &mutatedVars, globals: &globals)
-        
+
         var locals = mutatedVars
         locals.subtract(globals)
         locals.subtract(properties)
@@ -184,14 +184,14 @@ public final class LingoTranspiler {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
             output += "\(indent)_ = `\(variable)`\n"
         }
-        
+
         for arg in args where arg.lowercased() != "me" {
             let isMutated = mutatedVars.contains(arg.lowercased())
             let keyword = isMutated ? "var" : "let"
             output += "\(indent)\(keyword) `\(arg.lowercased())`: LingoValue = `\(arg.lowercased())`\n"
             output += "\(indent)_ = `\(arg.lowercased())`\n"
         }
-        
+
         if !hoisted.isEmpty || args.count > (args.contains { $0.lowercased() == "me" } ? 1 : 0) { output += "\n" }
 
         for stmt in body {
