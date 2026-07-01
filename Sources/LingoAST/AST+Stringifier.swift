@@ -216,6 +216,8 @@ extension Expression {
             return "the \(prop) of sprite \(spriteId.toLingoSource())"
         case .newObj(let type, let args):
             return "new(script \"\(type)\", \(args.toLingoSource()))"
+        case .range(let start, let end):
+            return "\(start.toLingoSource()) to \(end.toLingoSource())"
         }
     }
 }

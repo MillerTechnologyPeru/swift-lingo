@@ -604,6 +604,10 @@ public final class LingoTranspiler {
         case .newObj(let type, let args):
             let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod)
             return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
+        case .range(let start, let end):
+            let s = transpile(expression: start, locals: locals, isMethod: isMethod)
+            let e = transpile(expression: end, locals: locals, isMethod: isMethod)
+            return "LingoRange(\(s), \(e))"
         default:
             return ".void /* Unsupported expression: \(expression) */"
         }
