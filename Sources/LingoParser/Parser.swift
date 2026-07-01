@@ -460,7 +460,7 @@ public class Parser {
     }
 
     // Simplified Pratt parser for expressions
-    private func parseExpression() -> Expression? {
+    func parseExpression() -> LingoAST.Expression? {
         return parseBinaryExpression(precedence: 0)
     }
 

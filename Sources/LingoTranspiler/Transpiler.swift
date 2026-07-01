@@ -469,7 +469,7 @@ public final class LingoTranspiler {
         }
     }
 
-    private func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
+    func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
         switch expression {
         case .void: return "LingoValue.void"
         case .integer(let v): return "LingoValue.integer(\(v))"
