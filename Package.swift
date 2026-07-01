@@ -46,8 +46,7 @@ let package = Package(
                 "LingoTranspiler",
                 "LingoAST",
                 "LingoParser",
-                .product(name: "Subprocess", package: "swift-subprocess"),
-                .product(name: "SystemPackage", package: "swift-system")
+                .product(name: "Subprocess", package: "swift-subprocess")
             ],
             resources: [.copy("../LingoParserTests/Resources")],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
