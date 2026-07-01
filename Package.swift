@@ -105,24 +105,3 @@ let package = Package(
         )
     ]
 )
-
-// MARK: Embedded overrides
-
-if isSet("ENABLE_EMBEDDED") {
-    package.products += [
-        .library(name: "LingoBytecodeEmbedded", targets: ["LingoBytecodeEmbedded"])
-    ]
-
-    package.targets += [
-        .target(
-            name: "LingoBytecodeEmbedded",
-            dependencies: ["LingoAST"],
-            path: "Sources/LingoBytecodeEmbedded",
-            swiftSettings: [
-                .enableExperimentalFeature("Embedded"),
-                .enableExperimentalFeature("Lifetimes"),
-                .strictMemorySafety()
-            ]
-        )
-    ]
-}
