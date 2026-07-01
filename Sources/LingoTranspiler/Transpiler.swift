@@ -8,7 +8,7 @@ public final class LingoTranspiler {
     public var log: ((String) -> Void)?
     public var maxDepth: UInt = 500
     public var maxCommentDepth: UInt = 500
-    
+
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
     private var script: Script
