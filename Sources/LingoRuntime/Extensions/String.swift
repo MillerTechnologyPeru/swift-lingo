@@ -11,7 +11,11 @@ private func _asciiLowercased(_ byte: UInt8) -> UInt8 {
 
 extension String {
     public func asciiLowercased() -> String {
+        let needsLowercasing = self.utf8.contains { $0 >= 65 && $0 <= 90 }
+        if !needsLowercasing { return self }
+
         var bytes: [UInt8] = []
+        bytes.reserveCapacity(self.utf8.count)
         for byte in self.utf8 {
             bytes.append(_asciiLowercased(byte))
         }
