@@ -271,6 +271,23 @@ public final class LingoTranspiler {
         }
     }
 
+    /// Transpiles a sequence of statements, stopping after the first terminator
+    /// (return, exit, exitRepeat, nextRepeat) to avoid dead-code warnings in Swift.
+    private func transpileBody(_ statements: [Statement], indent: String, locals: Set<String>, isMethod: Bool) -> String {
+        var output = ""
+        for stmt in statements {
+            output += transpile(statement: stmt, indent: indent, locals: locals, isMethod: isMethod)
+            // Stop emitting after terminators — anything following is dead code
+            switch stmt {
+            case .returnStatement, .exit, .exitRepeat, .nextRepeat, .pass:
+                return output
+            default:
+                break
+            }
+        }
+        return output
+    }
+
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) -> String {
         let maxCommentDepth = 8
         let commentedSource: String
@@ -416,7 +433,14 @@ public final class LingoTranspiler {
         var output = ""
         if case .identifier(let name) = target {
             let lower = name.lowercased()
-            if locals.contains(lower) {
+            if lower == "me" {
+                // `me` is the object reference (`self`), not a reassignable
+                // variable; a script that assigns into it directly (or into
+                // a chunk of it, e.g. `me.char[n] = ...`) can't be mutated
+                // that way, so evaluate the right-hand side for any side
+                // effects and discard the result.
+                output += "\(indent)_ = \(valStr)\n"
+            } else if locals.contains(lower) {
                 output += "\(indent)`\(lower)` = \(valStr)\n"
             } else if isMethod && activeProperties.contains(lower) {
                 output += "\(indent)self.`\(name)` = \(valStr)\n"
