@@ -142,7 +142,8 @@ public final class LingoTranspiler {
         for handler in validHandlers {
             let lingoArgs = handler.arguments.filter { $0.lowercased() != "me" }
             let callArgs = lingoArgs.indices.map { "args.count > \($0) ? args[\($0)] : .void" }.joined(separator: ", ")
-            output += "        case .`\(handler.name.lowercased())`: return self.`\(handler.name)`(\(callArgs))\n"
+            output += "        case .`\(handler.name.lowercased())`:\n"
+            output += "            return self.`\(handler.name)`(\(callArgs))\n"
         }
         output += "        }\n"
         output += "    }\n\n"
@@ -361,7 +362,7 @@ public final class LingoTranspiler {
             output += "\(indent)}\n"
         case .expressionStatement(let expr):
             let exprStr = transpile(expression: expr, locals: locals, isMethod: isMethod)
-            output += "\(indent)let _ : LingoValue = \(exprStr)\n"
+            output += "\(indent)let _: LingoValue = \(exprStr)\n"
         case .returnStatement(let expr):
             if activeHandlerIsInitializer {
                 if let expr, !expr.isMeReference {
