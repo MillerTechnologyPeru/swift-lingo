@@ -182,23 +182,14 @@ public final class LingoTranspiler {
         let hoisted = locals.filter { !argumentNames.contains($0) }.sorted()
         for variable in hoisted {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
+            output += "\(indent)_ = `\(variable)`\n"
         }
         
-        var shadowedArgs: [String] = []
         for arg in args where arg.lowercased() != "me" {
             let isMutated = mutatedVars.contains(arg.lowercased())
             let keyword = isMutated ? "var" : "let"
             output += "\(indent)\(keyword) `\(arg.lowercased())`: LingoValue = `\(arg.lowercased())`\n"
-            shadowedArgs.append(arg.lowercased())
-        }
-        
-        let allMutables = hoisted + shadowedArgs
-        if !allMutables.isEmpty {
-            output += "\(indent)defer { \n"
-            for mutable in allMutables {
-                output += "\(indent)    _ = `\(mutable)`\n"
-            }
-            output += "\(indent)}\n"
+            output += "\(indent)_ = `\(arg.lowercased())`\n"
         }
         
         if !hoisted.isEmpty || args.count > (args.contains { $0.lowercased() == "me" } ? 1 : 0) { output += "\n" }
