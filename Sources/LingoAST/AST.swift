@@ -83,6 +83,7 @@ public indirect enum Expression: Equatable {
     case soundProp(soundId: Expression, prop: String)
     case spriteProp(spriteId: Expression, prop: String)
     case newObj(type: String, args: Expression)
+    case range(start: Expression, end: Expression)
 }
 
 public struct PropertyListEntry: Equatable {

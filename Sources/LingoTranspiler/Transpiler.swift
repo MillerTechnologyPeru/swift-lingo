@@ -142,7 +142,8 @@ public final class LingoTranspiler {
         for handler in validHandlers {
             let lingoArgs = handler.arguments.filter { $0.lowercased() != "me" }
             let callArgs = lingoArgs.indices.map { "args.count > \($0) ? args[\($0)] : .void" }.joined(separator: ", ")
-            output += "        case .`\(handler.name.lowercased())`: return self.`\(handler.name)`(\(callArgs))\n"
+            output += "        case .`\(handler.name.lowercased())`:\n"
+            output += "            return self.`\(handler.name)`(\(callArgs))\n"
         }
         output += "        }\n"
         output += "    }\n\n"
@@ -172,7 +173,7 @@ public final class LingoTranspiler {
         var mutatedVars = Set<String>()
         var globals = Set<String>()
         collectVariables(in: body, locals: &mutatedVars, globals: &globals)
-        
+
         var locals = mutatedVars
         locals.subtract(globals)
         locals.subtract(properties)
@@ -184,14 +185,14 @@ public final class LingoTranspiler {
             output += "\(indent)var `\(variable)`: LingoValue = .void\n"
             output += "\(indent)_ = `\(variable)`\n"
         }
-        
+
         for arg in args where arg.lowercased() != "me" {
             let isMutated = mutatedVars.contains(arg.lowercased())
             let keyword = isMutated ? "var" : "let"
             output += "\(indent)\(keyword) `\(arg.lowercased())`: LingoValue = `\(arg.lowercased())`\n"
             output += "\(indent)_ = `\(arg.lowercased())`\n"
         }
-        
+
         if !hoisted.isEmpty || args.count > (args.contains { $0.lowercased() == "me" } ? 1 : 0) { output += "\n" }
 
         for stmt in body {
@@ -361,7 +362,7 @@ public final class LingoTranspiler {
             output += "\(indent)}\n"
         case .expressionStatement(let expr):
             let exprStr = transpile(expression: expr, locals: locals, isMethod: isMethod)
-            output += "\(indent)let _ : LingoValue = \(exprStr)\n"
+            output += "\(indent)let _: LingoValue = \(exprStr)\n"
         case .returnStatement(let expr):
             if activeHandlerIsInitializer {
                 if let expr, !expr.isMeReference {
@@ -469,7 +470,7 @@ public final class LingoTranspiler {
         }
     }
 
-    private func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
+    func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
         switch expression {
         case .void: return "LingoValue.void"
         case .integer(let v): return "LingoValue.integer(\(v))"
@@ -604,6 +605,10 @@ public final class LingoTranspiler {
         case .newObj(let type, let args):
             let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod)
             return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
+        case .range(let start, let end):
+            let s = transpile(expression: start, locals: locals, isMethod: isMethod)
+            let e = transpile(expression: end, locals: locals, isMethod: isMethod)
+            return "LingoRange(\(s), \(e))"
         default:
             return ".void /* Unsupported expression: \(expression) */"
         }

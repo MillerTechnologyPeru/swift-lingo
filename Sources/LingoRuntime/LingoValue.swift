@@ -460,3 +460,18 @@ extension LingoValue {
         }
     }
 }
+
+// MARK: - Range Matching Support
+
+public struct LingoRange {
+    public let start: LingoValue
+    public let end: LingoValue
+    public init(_ start: LingoValue, _ end: LingoValue) {
+        self.start = start
+        self.end = end
+    }
+}
+
+public func ~= (pattern: LingoRange, value: LingoValue) -> Bool {
+    return (value >= pattern.start).asBool() && (value <= pattern.end).asBool()
+}
