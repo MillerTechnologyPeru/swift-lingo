@@ -31,8 +31,9 @@ public struct HandlerDef: Equatable, Sendable {
             guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
                 throw LingoBytecodeError.invalidOffset(absoluteOffset)
             }
-            var bytecodeSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
+            var bytecodeSpan = unsafe ParserSpan(
+                _unsafeBytes: UnsafeRawBufferPointer(
+                    rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
 
             var bytecodeArray: [Bytecode] = []
             bytecodeArray.reserveCapacity(record.compiledLen)
@@ -69,8 +70,9 @@ public struct HandlerDef: Equatable, Sendable {
             guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
                 throw LingoBytecodeError.invalidOffset(offset)
             }
-            var tableSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
+            var tableSpan = unsafe ParserSpan(
+                _unsafeBytes: UnsafeRawBufferPointer(
+                    rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
             var result: [UInt16] = []
             result.reserveCapacity(count)
             for _ in 0..<count {
