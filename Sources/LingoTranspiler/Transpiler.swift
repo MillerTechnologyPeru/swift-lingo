@@ -191,18 +191,7 @@ public final class LingoTranspiler {
         }
 
         if !isInitializer {
-            let needsReturnVoid: Bool
-            if let last = body.last {
-                switch last {
-                case .returnStatement, .exit, .pass:
-                    needsReturnVoid = false
-                default:
-                    needsReturnVoid = true
-                }
-            } else {
-                needsReturnVoid = true
-            }
-            if needsReturnVoid {
+            if !alwaysReturns(body) {
                 output += "\(indent)return .void\n"
             }
         }
@@ -243,6 +232,29 @@ public final class LingoTranspiler {
             default:
                 break
             }
+        }
+    }
+
+    private func alwaysReturns(_ statements: [Statement]) -> Bool {
+        guard let last = statements.last else { return false }
+        switch last {
+        case .returnStatement, .exit, .pass:
+            return true
+        case .ifStatement(_, let body, let elseBody):
+            if let elseBody = elseBody {
+                return alwaysReturns(body) && alwaysReturns(elseBody)
+            }
+            return false
+        case .caseStatement(_, let cases, let otherwise):
+            for c in cases {
+                if !alwaysReturns(c.body) { return false }
+            }
+            if let otherwise = otherwise {
+                return alwaysReturns(otherwise)
+            }
+            return false
+        default:
+            return false
         }
     }
 
