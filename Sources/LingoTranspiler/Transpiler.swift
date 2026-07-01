@@ -6,6 +6,7 @@ public final class LingoTranspiler {
 
     /// Optional logger. When set, the transpiler calls this with diagnostic messages.
     public var log: ((String) -> Void)?
+    public var maxDepth: Int = 500
 
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
@@ -506,7 +507,7 @@ public final class LingoTranspiler {
     }
 
     func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool, depth: Int = 0) -> String {
-        guard depth < 10 else { return ".void /* expression depth limit exceeded */" }
+        guard depth < maxDepth else { return ".void /* expression depth limit exceeded */" }
         switch expression {
         case .void: return "LingoValue.void"
         case .integer(let v): return "LingoValue.integer(\(v))"
