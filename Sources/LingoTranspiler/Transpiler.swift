@@ -481,7 +481,8 @@ public final class LingoTranspiler {
         }
     }
 
-    func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool) -> String {
+    func transpile(expression: LingoAST.Expression, locals: Set<String>, isMethod: Bool, depth: Int = 0) -> String {
+        guard depth < 10 else { return ".void /* expression depth limit exceeded */" }
         switch expression {
         case .void: return "LingoValue.void"
         case .integer(let v): return "LingoValue.integer(\(v))"
@@ -503,13 +504,13 @@ public final class LingoTranspiler {
         case .the(let prop):
             return isMethod ? "self.`\(prop)`" : "LingoEnvironment.shared.getGlobal(\"\(prop)\")"
         case .propertyAccess(let target, let prop, _):
-            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
+            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr).`\(prop)`"
         case .functionCall(let target, let name, let args):
             let lingoArgs = args.filter { !$0.isMeReference }
-            let argStr = lingoArgs.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
+            let argStr = lingoArgs.map { transpile(expression: $0, locals: locals, isMethod: isMethod, depth: depth + 1) }.joined(separator: ", ")
             if let t = target {
-                let tStr = t.isMeReference ? "self" : transpile(expression: t, locals: locals, isMethod: isMethod)
+                let tStr = t.isMeReference ? "self" : transpile(expression: t, locals: locals, isMethod: isMethod, depth: depth + 1)
                 return "\(tStr).`\(name)`(\(argStr))"
             } else {
                 if locals.contains(name.lowercased()) {
@@ -519,11 +520,11 @@ public final class LingoTranspiler {
                 }
             }
         case .call(let name, let argExpr), .objCall(let name, let argExpr):
-            let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod)
+            let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
             return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
         case .objCallV4(let obj, let argExpr):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod)
+            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let argStr = transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(objStr)(\(argStr))"
         case .binaryOperation:
             // Unroll the left-leaning chain iteratively to avoid stack overflow
@@ -536,9 +537,9 @@ public final class LingoTranspiler {
                 current = left
             }
             rhsTerms.reverse()
-            var result = transpile(expression: current, locals: locals, isMethod: isMethod)
+            var result = transpile(expression: current, locals: locals, isMethod: isMethod, depth: depth + 1)
             for (op, rExpr) in rhsTerms {
-                let r = transpile(expression: rExpr, locals: locals, isMethod: isMethod)
+                let r = transpile(expression: rExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
                 switch op {
                 case .equals: result = "(\(result) == \(r))"
                 case .notEquals: result = "(\(result) != \(r))"
@@ -556,78 +557,78 @@ public final class LingoTranspiler {
             }
             return result
         case .unaryOperation(let op, let operand):
-            let opr = transpile(expression: operand, locals: locals, isMethod: isMethod)
+            let opr = transpile(expression: operand, locals: locals, isMethod: isMethod, depth: depth + 1)
             if op == .not {
                 return "((\(opr)).asBool() ? LingoValue.integer(0) : LingoValue.integer(1))"
             }
             return "(\(op.rawValue)\(opr))"
         case .list(let items):
-            let itemsStr = items.map { transpile(expression: $0, locals: locals, isMethod: isMethod) }.joined(separator: ", ")
+            let itemsStr = items.map { transpile(expression: $0, locals: locals, isMethod: isMethod, depth: depth + 1) }.joined(separator: ", ")
             return "LingoValue.list([\(itemsStr)])"
         case .propertyList(let entries):
             let entriesStr = entries.map {
-                "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod)))"
+                "(key: \(transpile(expression: $0.key, locals: locals, isMethod: isMethod, depth: depth + 1)), value: \(transpile(expression: $0.value, locals: locals, isMethod: isMethod, depth: depth + 1)))"
             }.joined(separator: ", ")
             return "LingoValue.propertyList([\(entriesStr)])"
         case .elementAccess(let target, let index):
-            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
-            let iStr = transpile(expression: index, locals: locals, isMethod: isMethod)
+            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let iStr = transpile(expression: index, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr)[\(iStr)]"
         case .elementRangeAccess(let target, let start, let end):
-            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod)
-            let sStr = transpile(expression: start, locals: locals, isMethod: isMethod)
-            let eStr = transpile(expression: end, locals: locals, isMethod: isMethod)
+            let tStr = transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let sStr = transpile(expression: start, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let eStr = transpile(expression: end, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr).getRange(start: \(sStr), end: \(eStr))"
         case .objPropIndex(let obj, let prop, let index, let index2):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-            let indexStr = transpile(expression: index, locals: locals, isMethod: isMethod)
+            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let indexStr = transpile(expression: index, locals: locals, isMethod: isMethod, depth: depth + 1)
             if let index2 {
-                let index2Str = transpile(expression: index2, locals: locals, isMethod: isMethod)
+                let index2Str = transpile(expression: index2, locals: locals, isMethod: isMethod, depth: depth + 1)
                 return "\(objStr).`\(prop)`.getRange(start: \(indexStr), end: \(index2Str))"
             }
             return "\(objStr).`\(prop)`[\(indexStr)]"
         case .chunkExpression(let type, let first, let last, let string, _):
-            let stringStr = transpile(expression: string, locals: locals, isMethod: isMethod)
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let lastStr = last.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? "nil"
+            let stringStr = transpile(expression: string, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let lastStr = last.map { transpile(expression: $0, locals: locals, isMethod: isMethod, depth: depth + 1) } ?? "nil"
             return "\(stringStr).chunk(\"\(type.lingoName)\", start: \(firstStr), end: \(lastStr))"
         case .lastStringChunk(let type, let obj):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(objStr).lastChunk(\"\(type.lingoName)\")"
         case .stringChunkCount(let type, let obj):
-            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(objStr).chunkCount(\"\(type.lingoName)\")"
         case .spriteIntersects(let first, let second):
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let secondStr = transpile(expression: second, locals: locals, isMethod: isMethod)
+            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let secondStr = transpile(expression: second, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"intersects\", args: [\(firstStr), \(secondStr)])"
         case .spriteWithin(let first, let second):
-            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
-            let secondStr = transpile(expression: second, locals: locals, isMethod: isMethod)
+            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let secondStr = transpile(expression: second, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"within\", args: [\(firstStr), \(secondStr)])"
         case .menuProp(let menuId, let prop):
-            let menuStr = transpile(expression: menuId, locals: locals, isMethod: isMethod)
+            let menuStr = transpile(expression: menuId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"menu\", args: [\(menuStr)]).`\(prop)`"
         case .menuItemProp(let menuId, let itemId, let prop):
-            let menuStr = transpile(expression: menuId, locals: locals, isMethod: isMethod)
-            let itemStr = transpile(expression: itemId, locals: locals, isMethod: isMethod)
+            let menuStr = transpile(expression: menuId, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let itemStr = transpile(expression: itemId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"menuItem\", args: [\(itemStr), \(menuStr)]).`\(prop)`"
         case .soundProp(let soundId, let prop):
-            let soundStr = transpile(expression: soundId, locals: locals, isMethod: isMethod)
+            let soundStr = transpile(expression: soundId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"sound\", args: [\(soundStr)]).`\(prop)`"
         case .spriteProp(let spriteId, let prop):
-            let spriteStr = transpile(expression: spriteId, locals: locals, isMethod: isMethod)
+            let spriteStr = transpile(expression: spriteId, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoEnvironment.shared.callGlobal(\"sprite\", args: [\(spriteStr)]).`\(prop)`"
         case .member(let type, let id, _):
-            let idStr = transpile(expression: id, locals: locals, isMethod: isMethod)
+            let idStr = transpile(expression: id, locals: locals, isMethod: isMethod, depth: depth + 1)
             let functionName = type.lowercased() == "sprite" ? "sprite" : "member"
             return isMethod ? "self.`\(functionName)`(\(idStr))" : "LingoEnvironment.shared.callGlobal(\"\(functionName)\", args: [\(idStr)])"
         case .newObj(let type, let args):
-            let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod)
+            let argsStr = transpile(expression: args, locals: locals, isMethod: isMethod, depth: depth + 1)
             return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
         case .range(let start, let end):
-            let s = transpile(expression: start, locals: locals, isMethod: isMethod)
-            let e = transpile(expression: end, locals: locals, isMethod: isMethod)
+            let s = transpile(expression: start, locals: locals, isMethod: isMethod, depth: depth + 1)
+            let e = transpile(expression: end, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "LingoRange(\(s), \(e))"
         default:
             return ".void /* Unsupported expression: \(expression) */"
