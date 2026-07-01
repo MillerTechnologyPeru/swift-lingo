@@ -38,6 +38,11 @@ let package = Package(
             dependencies: ["LingoAST", "LingoParser"],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
+        .testTarget(
+            name: "LingoTranspilerTests",
+            dependencies: ["LingoTranspiler", "LingoAST", "LingoParser"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
         // Compiler CLI (Executable)
         .executableTarget(
             name: "swiftlingoc",
