@@ -62,8 +62,9 @@ public struct LiteralStore: Equatable, Sendable {
             guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
                 throw LingoBytecodeError.invalidOffset(record.offset)
             }
-            var literalSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
+            var literalSpan = unsafe ParserSpan(
+                _unsafeBytes: UnsafeRawBufferPointer(
+                    rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
             let length = Int(try UInt32(parsingBigEndian: &literalSpan))
             switch record.literalType {
             case .string:
@@ -72,8 +73,9 @@ public struct LiteralStore: Equatable, Sendable {
                 guard stringEnd <= rawBuffer.count else {
                     throw LingoBytecodeError.invalidOffset(record.offset)
                 }
-                var stringSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                    rebasing: rawBuffer[offsetInBuffer + 4..<stringEnd]))
+                var stringSpan = unsafe ParserSpan(
+                    _unsafeBytes: UnsafeRawBufferPointer(
+                        rebasing: rawBuffer[offsetInBuffer + 4..<stringEnd]))
                 let stringBytes = try [UInt8](parsing: &stringSpan, byteCount: stringByteCount)
                 if let decoded = String(bytes: stringBytes, encoding: .ascii) {
                     return .string(decoded)
@@ -85,8 +87,9 @@ public struct LiteralStore: Equatable, Sendable {
                     guard doubleEnd <= rawBuffer.count else {
                         throw LingoBytecodeError.invalidOffset(record.offset)
                     }
-                    var doubleSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                        rebasing: rawBuffer[offsetInBuffer + 4..<doubleEnd]))
+                    var doubleSpan = unsafe ParserSpan(
+                        _unsafeBytes: UnsafeRawBufferPointer(
+                            rebasing: rawBuffer[offsetInBuffer + 4..<doubleEnd]))
                     let uint64 = try UInt64(parsingBigEndian: &doubleSpan)
                     return .double(Double(bitPattern: uint64))
                 }
@@ -96,8 +99,9 @@ public struct LiteralStore: Equatable, Sendable {
                 guard jsEnd <= rawBuffer.count else {
                     throw LingoBytecodeError.invalidOffset(record.offset)
                 }
-                var jsSpan = unsafe ParserSpan(_unsafeBytes: UnsafeRawBufferPointer(
-                    rebasing: rawBuffer[offsetInBuffer + 4..<jsEnd]))
+                var jsSpan = unsafe ParserSpan(
+                    _unsafeBytes: UnsafeRawBufferPointer(
+                        rebasing: rawBuffer[offsetInBuffer + 4..<jsEnd]))
                 let jsBytes = try [UInt8](parsing: &jsSpan, byteCount: length)
                 return .javascript(jsBytes)
             default:
