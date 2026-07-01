@@ -277,48 +277,11 @@ public final class LingoTranspiler {
             break
         case .assignment(let target, let value, _):
             let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
-            if case .identifier(let name) = target {
-                let lower = name.lowercased()
-                if locals.contains(lower) {
-                    output += "\(indent)`\(lower)` = \(valStr)\n"
-                } else if isMethod && activeProperties.contains(lower) {
-                    output += "\(indent)self.`\(name)` = \(valStr)\n"
-                } else {
-                    output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
-                }
-            } else if let memberProperty = transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
-                output += "\(indent)\(memberProperty)\n"
-            } else if case .propertyAccess(let obj, let prop, _) = target {
-                let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-                output += "\(indent)\(objStr).setProperty(\"\(prop)\", value: \(valStr))\n"
-            } else if case .elementAccess(let obj, let indexExpr) = target {
-                let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
-                let idxStr = transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
-                output += "\(indent)\(objStr).setElement(index: \(idxStr), value: \(valStr))\n"
-            } else if case .the(let name) = target {
-                output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
-            } else {
-                let targetStr = transpile(expression: target, locals: locals, isMethod: isMethod)
-                output += "\(indent)\(targetStr) = \(valStr)\n"
-            }
+            output += transpileAssignment(target: target, valStr: valStr, indent: indent, locals: locals, isMethod: isMethod)
         case .put(_, let value, let target):
             let valStr = transpile(expression: value, locals: locals, isMethod: isMethod)
             if let t = target {
-                if case .identifier(let name) = t {
-                    let lower = name.lowercased()
-                    if locals.contains(lower) {
-                        output += "\(indent)`\(lower)` = \(valStr)\n"
-                    } else if isMethod && activeProperties.contains(lower) {
-                        output += "\(indent)self.`\(name)` = \(valStr)\n"
-                    } else {
-                        output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
-                    }
-                } else if case .the(let name) = t {
-                    output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
-                } else {
-                    let targetStr = transpile(expression: t, locals: locals, isMethod: isMethod)
-                    output += "\(indent)\(targetStr) = \(valStr)\n"
-                }
+                output += transpileAssignment(target: t, valStr: valStr, indent: indent, locals: locals, isMethod: isMethod)
             }
         case .ifStatement(let cond, let body, let elseBody):
             let condStr = transpile(expression: cond, locals: locals, isMethod: isMethod)
@@ -431,6 +394,40 @@ public final class LingoTranspiler {
         case .chunkDelete(let chunk):
             let chunkStr = transpile(expression: chunk, locals: locals, isMethod: isMethod)
             output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"delete\", args: [\(chunkStr)])\n"
+        }
+        return output
+    }
+
+    private func transpileAssignment(target: LingoAST.Expression, valStr: String, indent: String, locals: Set<String>, isMethod: Bool) -> String {
+        var output = ""
+        if case .identifier(let name) = target {
+            let lower = name.lowercased()
+            if locals.contains(lower) {
+                output += "\(indent)`\(lower)` = \(valStr)\n"
+            } else if isMethod && activeProperties.contains(lower) {
+                output += "\(indent)self.`\(name)` = \(valStr)\n"
+            } else {
+                output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
+            }
+        } else if let memberProperty = transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
+            output += "\(indent)\(memberProperty)\n"
+        } else if case .propertyAccess(let obj, let prop, _) = target {
+            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            output += "\(indent)\(objStr).setProperty(\"\(prop)\", value: \(valStr))\n"
+        } else if case .elementAccess(let obj, let indexExpr) = target {
+            let objStr = transpile(expression: obj, locals: locals, isMethod: isMethod)
+            let idxStr = transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
+            output += "\(indent)\(objStr).setElement(index: \(idxStr), value: \(valStr))\n"
+        } else if case .the(let name) = target {
+            output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
+        } else if case .chunkExpression(let type, let first, let last, let string, _) = target {
+            let firstStr = transpile(expression: first, locals: locals, isMethod: isMethod)
+            let lastStr = last.map { transpile(expression: $0, locals: locals, isMethod: isMethod) } ?? "nil"
+            let newStringValue = "(\(transpile(expression: string, locals: locals, isMethod: isMethod))).settingChunk(\"\(type.lingoName)\", start: \(firstStr), end: \(lastStr), value: \(valStr))"
+            output += transpileAssignment(target: string, valStr: newStringValue, indent: indent, locals: locals, isMethod: isMethod)
+        } else {
+            let targetStr = transpile(expression: target, locals: locals, isMethod: isMethod)
+            output += "\(indent)\(targetStr) = \(valStr)\n"
         }
         return output
     }
