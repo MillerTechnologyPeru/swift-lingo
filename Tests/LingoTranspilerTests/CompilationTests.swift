@@ -70,10 +70,20 @@ struct CompilationTests {
         let isLocalSwiftLingoCheckout =
             (try? String(contentsOf: localManifest, encoding: .utf8))?.contains("name: \"SwiftLingo\"") ?? false
 
-        let dependency =
-            isLocalSwiftLingoCheckout
-            ? ".package(name: \"SwiftLingo\", path: \"\(swiftLingoPath)\")"
-            : ".package(url: \"https://github.com/MillerTechnologyPeru/swift-lingo\", branch: \"main\")"
+        // A local path dependency can declare its own package identity via
+        // `name:`, but a URL-based dependency's identity is always derived
+        // from the repo name in the URL (`swift-lingo`), regardless of the
+        // manifest's `name: "SwiftLingo"` — so the `.product(package:)`
+        // reference below has to match whichever identity is actually in play.
+        let dependency: String
+        let packageIdentity: String
+        if isLocalSwiftLingoCheckout {
+            dependency = ".package(name: \"SwiftLingo\", path: \"\(swiftLingoPath)\")"
+            packageIdentity = "SwiftLingo"
+        } else {
+            dependency = ".package(url: \"https://github.com/MillerTechnologyPeru/swift-lingo\", branch: \"main\")"
+            packageIdentity = "swift-lingo"
+        }
 
         let packageSwift = """
             // swift-tools-version: 6.3
@@ -88,7 +98,7 @@ struct CompilationTests {
                     .target(
                         name: "LingoCompileTest",
                         dependencies: [
-                            .product(name: "LingoRuntime", package: "SwiftLingo")
+                            .product(name: "LingoRuntime", package: "\(packageIdentity)")
                         ],
                         swiftSettings: [.swiftLanguageMode(.v5)]
                     )
