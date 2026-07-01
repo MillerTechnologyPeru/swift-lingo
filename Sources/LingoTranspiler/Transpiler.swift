@@ -6,8 +6,9 @@ public final class LingoTranspiler {
 
     /// Optional logger. When set, the transpiler calls this with diagnostic messages.
     public var log: ((String) -> Void)?
-    public var maxDepth: Int = 500
-
+    public var maxDepth: UInt = 500
+    public var maxCommentDepth: UInt = 500
+    
     private var activeProperties: Set<String> = []
     private var activeHandlerIsInitializer = false
     private var script: Script
@@ -276,7 +277,6 @@ public final class LingoTranspiler {
     }
 
     private func transpile(statement: Statement, indent: String, locals: Set<String>, isMethod: Bool) async -> String {
-        let maxCommentDepth = 8
         let commentedSource: String
         let depth = expressionDepth(of: statement)
         log?("Statement depth: \(depth)")
