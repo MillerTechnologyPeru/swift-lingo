@@ -14,59 +14,52 @@ struct RoundTripValidationTests {
     }
 
     @Test
-    func allJunkbotFilesRoundTrip() throws {
+    func allJunkbotFilesRoundTrip() async throws {
         let files = JunkbotFixtures.allLingoFiles()
         #expect(!files.isEmpty, "Should find .ls files in the test bundle")
 
-        // The recursive stringifier can overflow Swift Testing's worker-thread
-        // stack on deeply nested expressions, so run the corpus on a large stack.
-        // ASTs stay inside the closure; only the Sendable findings escape.
-        let findings = try withLargeStack { () -> Findings in
-            var findings = Findings()
+        var findings = Findings()
 
-            for file in files {
-                let name = JunkbotFixtures.relativePath(file)
-                let source: String
-                do {
-                    source = try String(contentsOf: file, encoding: .utf8)
-                } catch {
-                    findings.parseFailures.append("\(name): unreadable - \(error)")
-                    continue
-                }
-
-                var lexer = Lexer(input: source)
-                let tokens = lexer.tokenize()
-                let parser = Parser(tokens: tokens)
-                let script = parser.parseScript()
-
-                // Only track trailing newlines as non-fatal
-                if !parser.skippedTokens.isEmpty && parser.skippedTokens.allSatisfy({ $0 == .newline }) {
-                    findings.trailingNewlineSkips.append("\(name): \(parser.skippedTokens.count) trailing newline(s)")
-                } else if !parser.skippedTokens.isEmpty {
-                    findings.parseFailures.append("\(name): initial parse skipped \(parser.skippedTokens.count) tokens")
-                }
-
-                let stringified = script.toLingoSource()
-
-                var lexer2 = Lexer(input: stringified)
-                let tokens2 = lexer2.tokenize()
-                let parser2 = Parser(tokens: tokens2)
-                let script2 = parser2.parseScript()
-
-                // Check for skipped tokens on re-parse
-                if !parser2.skippedTokens.isEmpty && parser2.skippedTokens.allSatisfy({ $0 == .newline }) {
-                    // Trailing newlines are acceptable
-                } else if !parser2.skippedTokens.isEmpty {
-                    findings.reparseFailures.append("\(name): re-parse skipped \(parser2.skippedTokens.count) tokens")
-                }
-
-                // Compare ASTs
-                if script != script2 {
-                    findings.astMismatches.append(name)
-                }
+        for file in files {
+            let name = JunkbotFixtures.relativePath(file)
+            let source: String
+            do {
+                source = try String(contentsOf: file, encoding: .utf8)
+            } catch {
+                findings.parseFailures.append("\(name): unreadable - \(error)")
+                continue
             }
 
-            return findings
+            var lexer = Lexer(input: source)
+            let tokens = lexer.tokenize()
+            let parser = Parser(tokens: tokens)
+            let script = parser.parseScript()
+
+            // Only track trailing newlines as non-fatal
+            if !parser.skippedTokens.isEmpty && parser.skippedTokens.allSatisfy({ $0 == .newline }) {
+                findings.trailingNewlineSkips.append("\(name): \(parser.skippedTokens.count) trailing newline(s)")
+            } else if !parser.skippedTokens.isEmpty {
+                findings.parseFailures.append("\(name): initial parse skipped \(parser.skippedTokens.count) tokens")
+            }
+
+            let stringified = await script.toLingoSource()
+
+            var lexer2 = Lexer(input: stringified)
+            let tokens2 = lexer2.tokenize()
+            let parser2 = Parser(tokens: tokens2)
+            let script2 = parser2.parseScript()
+
+            // Check for skipped tokens on re-parse
+            if !parser2.skippedTokens.isEmpty && parser2.skippedTokens.allSatisfy({ $0 == .newline }) {
+                // Trailing newlines are acceptable
+            } else if !parser2.skippedTokens.isEmpty {
+                findings.reparseFailures.append("\(name): re-parse skipped \(parser2.skippedTokens.count) tokens")
+            }
+
+            // Compare ASTs
+            if script != script2 {
+                findings.astMismatches.append(name)
+            }
         }
 
         // Report non-fatal findings

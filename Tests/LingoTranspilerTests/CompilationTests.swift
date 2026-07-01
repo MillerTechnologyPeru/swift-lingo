@@ -52,7 +52,7 @@ struct CompilationTests {
         let parser = Parser(tokens: tokens)
         let script = parser.parseScript()
         let transpiler = LingoTranspiler(script: script, relativePath: "test.ls", originalPath: "test.ls")
-        let generatedCode = transpiler.transpile()
+        let generatedCode = await transpiler.transpile()
 
         // Generate a temporary package
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("LingoCompileTest-\(UUID().uuidString)")
@@ -105,7 +105,7 @@ struct CompilationTests {
             let fileTranspiler = LingoTranspiler(script: fileScript, relativePath: file.lastPathComponent, originalPath: file.path)
             fileTranspiler.log = { print($0) }
 
-            let fileGeneratedCode = "import LingoRuntime\n" + fileTranspiler.transpile()
+            let fileGeneratedCode = "import LingoRuntime\n" + (await fileTranspiler.transpile())
 
             let swiftFileName = file.lastPathComponent.replacingOccurrences(of: ".ls", with: ".swift")
             let fileUrl = sourcesDir.appendingPathComponent(swiftFileName)

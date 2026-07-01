@@ -70,7 +70,7 @@ struct PassAndParagraphTests {
     }
 
     @Test
-    func roundTripsPassAndParagraph() {
+    func roundTripsPassAndParagraph() async {
         let (script, _) = parse(
             """
             on test me
@@ -78,7 +78,7 @@ struct PassAndParagraphTests {
                 put paragraph 1 of myText into p
             end
             """)
-        let source = script.toLingoSource()
+        let source = await script.toLingoSource()
         #expect(source.contains("pass"))
         #expect(source.contains("paragraph 1"))
     }
