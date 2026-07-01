@@ -108,6 +108,7 @@ struct CompilationTests {
             let fileParser = Parser(tokens: fileTokens)
             let fileScript = fileParser.parseScript()
             let fileTranspiler = LingoTranspiler(script: fileScript, relativePath: file.lastPathComponent, originalPath: file.path)
+            fileTranspiler.log = { print($0) }
 
             let fileGeneratedCode = "import LingoRuntime\n" + fileTranspiler.transpile()
 
