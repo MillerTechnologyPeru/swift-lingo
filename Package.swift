@@ -13,7 +13,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(url: "https://github.com/swiftlang/swift-subprocess.git", .upToNextMinor(from: "0.4.0"))
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", .upToNextMinor(from: "0.4.0")),
+        .package(url: "https://github.com/apple/swift-system", from: "1.5.0")
     ],
     targets: [
         // AST
@@ -45,7 +46,8 @@ let package = Package(
                 "LingoTranspiler",
                 "LingoAST",
                 "LingoParser",
-                .product(name: "Subprocess", package: "swift-subprocess")
+                .product(name: "Subprocess", package: "swift-subprocess"),
+                .product(name: "SystemPackage", package: "swift-system")
             ],
             resources: [.copy("../LingoParserTests/Resources")],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
