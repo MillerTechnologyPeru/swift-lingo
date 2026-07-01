@@ -1,0 +1,84 @@
+import BinaryParsing
+
+public enum OpCode: UInt8, CaseIterable, Equatable, Hashable, Sendable {
+    // single-byte (0x00–0x3F)
+    case invalid = 0x00
+    case ret = 0x01
+    case retFactory = 0x02
+    case pushZero = 0x03
+    case mul = 0x04
+    case add = 0x05
+    case sub = 0x06
+    case div = 0x07
+    case mod = 0x08
+    case inv = 0x09
+    case joinStr = 0x0a
+    case joinPadStr = 0x0b
+    case lt = 0x0c
+    case ltEq = 0x0d
+    case ntEq = 0x0e
+    case eq = 0x0f
+    case gt = 0x10
+    case gtEq = 0x11
+    case and = 0x12
+    case or = 0x13
+    case not = 0x14
+    case containsStr = 0x15
+    case contains0Str = 0x16
+    case getChunk = 0x17
+    case hiliteChunk = 0x18
+    case ontoSpr = 0x19
+    case intoSpr = 0x1a
+    case getField = 0x1b
+    case startTell = 0x1c
+    case endTell = 0x1d
+    case pushList = 0x1e
+    case pushPropList = 0x1f
+    case swap = 0x21
+    case callJavaScript = 0x26
+
+    // multi-byte (0x40–0xFF)
+    case pushInt8 = 0x41
+    case pushArgListNoRet = 0x42
+    case pushArgList = 0x43
+    case pushCons = 0x44
+    case pushSymb = 0x45
+    case pushVarRef = 0x46
+    case getGlobal2 = 0x48
+    case getGlobal = 0x49
+    case getProp = 0x4a
+    case getParam = 0x4b
+    case getLocal = 0x4c
+    case setGlobal2 = 0x4e
+    case setGlobal = 0x4f
+    case setProp = 0x50
+    case setParam = 0x51
+    case setLocal = 0x52
+    case jmp = 0x53
+    case endRepeat = 0x54
+    case jmpIfZ = 0x55
+    case localCall = 0x56
+    case extCall = 0x57
+    case objCallV4 = 0x58
+    case put = 0x59
+    case putChunk = 0x5a
+    case deleteChunk = 0x5b
+    case get = 0x5c
+    case set = 0x5d
+    case getMovieProp = 0x5f
+    case setMovieProp = 0x60
+    case getObjProp = 0x61
+    case setObjProp = 0x62
+    case tellCall = 0x63
+    case peek = 0x64
+    case pop = 0x65
+    case theBuiltin = 0x66
+    case objCall = 0x67
+    case pushChunkVarRef = 0x6d
+    case pushInt16 = 0x6e
+    case pushInt32 = 0x6f
+    case getChainedProp = 0x70
+    case pushFloat32 = 0x71
+    case getTopLevelProp = 0x72
+    case newObj = 0x73
+}
