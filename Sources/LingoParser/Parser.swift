@@ -403,7 +403,9 @@ public class Parser {
 
                     if matchKeyword("to") {
                         if let expr2 = parseExpression() {
-                            // range not fully supported in AST values yet
+                            let lastExpr = values.removeLast()
+                            values.append(.range(start: lastExpr, end: expr2))
+                            if match(.comma) { continue }
                         }
                     } else {
                         break
