@@ -97,7 +97,9 @@ struct CompilationTests {
                 }
             }
             """
+        let mainSwiftURL = sourcesDir.appendingPathComponent("main.swift")
         try mainSwift.write(to: sourcesDir.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
+        print("Wrote to \(mainSwiftURL.path())")
 
         // Transpile them and write to separate swift files
         for file in lsFiles {
