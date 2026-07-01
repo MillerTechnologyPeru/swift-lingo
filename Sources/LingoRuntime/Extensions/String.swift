@@ -24,8 +24,10 @@ extension String {
 
     public func caseInsensitiveEquals(_ other: String) -> Bool {
         if self.utf8.count != other.utf8.count { return false }
-        return self.withUTF8 { lBuf in
-            other.withUTF8 { rBuf in
+        var lStr = self
+        var rStr = other
+        return lStr.withUTF8 { lBuf in
+            rStr.withUTF8 { rBuf in
                 if lBuf.count != rBuf.count { return false }
                 for i in 0..<lBuf.count {
                     if _asciiLowercased(lBuf[i]) != _asciiLowercased(rBuf[i]) {
@@ -38,8 +40,10 @@ extension String {
     }
 
     public func caseInsensitiveLessThan(_ other: String) -> Bool {
-        return self.withUTF8 { lBuf in
-            other.withUTF8 { rBuf in
+        var lStr = self
+        var rStr = other
+        return lStr.withUTF8 { lBuf in
+            rStr.withUTF8 { rBuf in
                 let minCount = Swift.min(lBuf.count, rBuf.count)
                 for i in 0..<minCount {
                     let lLower = _asciiLowercased(lBuf[i])
@@ -55,8 +59,10 @@ extension String {
 
     public func caseInsensitiveContains(_ substr: String) -> Bool {
         if substr.isEmpty { return true }
-        return self.withUTF8 { sBuf in
-            substr.withUTF8 { subBuf in
+        var sStr = self
+        var subStr = substr
+        return sStr.withUTF8 { sBuf in
+            subStr.withUTF8 { subBuf in
                 if subBuf.count > sBuf.count { return false }
                 if subBuf.isEmpty { return true }
                 for i in 0...(sBuf.count - subBuf.count) {
@@ -75,8 +81,10 @@ extension String {
     }
 
     public func caseInsensitiveStartsWith(_ prefix: String) -> Bool {
-        return self.withUTF8 { sBuf in
-            prefix.withUTF8 { pBuf in
+        var sStr = self
+        var pStr = prefix
+        return sStr.withUTF8 { sBuf in
+            pStr.withUTF8 { pBuf in
                 if pBuf.count > sBuf.count { return false }
                 if pBuf.isEmpty { return true }
                 for i in 0..<pBuf.count {
