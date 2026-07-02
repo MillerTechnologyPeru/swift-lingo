@@ -568,9 +568,6 @@ public final class LingoTranspiler {
                     return isMethod ? "self.`\(name)`(\(argStr))" : "\(environmentRef(isMethod: isMethod)).callGlobal(\"\(name)\", args: [\(argStr)])"
                 }
             }
-        case .objCall(let name, let argExpr):
-            let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return isMethod ? "self.`\(name)`(\(argStr))" : "\(environmentRef(isMethod: isMethod)).callGlobal(\"\(name)\", args: [\(argStr)])"
         case .objCallV4(let obj, let argExpr):
             let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
             let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)

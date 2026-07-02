@@ -152,15 +152,46 @@ extension AstNode {
             // call can round-trip through source text as.
             return .functionCall(target: nil, name: name, arguments: argListItems(args, syntax: syntax))
 
-        // `objCall`/`objCallV4` have the same round-trip gap `call` had
-        // (`LingoParser` has no production that yields either shape), left
-        // unaddressed for now since unlike a plain call, remapping them onto
-        // `functionCall` requires deciding what `target` should be from an
-        // opcode operand that only carries a method name, not a receiver.
         case .objCall(let name, let args):
-            return .objCall(name: name, args: args.asExpression(syntax: syntax))
+            // A generic (not built-in-recognized) `ObjCall` always pushes its
+            // receiver as the first element of the argument list — confirmed
+            // by the bytecode's own stack convention — so `items.first` is
+            // the receiver, matching `LingoParser`'s only production for
+            // `receiver.method(args)`: `functionCall(target: receiver, ...)`.
+            // `LingoParser` has no dedicated "object call" expression of its
+            // own, so this is the only shape it can round-trip through
+            // source text as.
+            let items = argListItems(args, syntax: syntax)
+            guard let target = items.first else {
+                return .functionCall(target: nil, name: name, arguments: [])
+            }
+            return .functionCall(target: target, name: name, arguments: Array(items.dropFirst()))
 
         case .objCallV4(let obj, let args):
+            // `obj` is a variable reference (`readVar`'s output) invoked
+            // directly as a callable, with no method name of its own. Lingo
+            // source can only produce this shape as a bare-identifier call
+            // (`fn(args)`), which `LingoParser` parses as
+            // `functionCall(target: nil, name: fn, arguments:)` — so that
+            // mapping only applies when `obj` actually reduces to a plain
+            // variable name (either `.variable`, from a preceding
+            // `GetGlobal`/`GetLocal`/`GetParam`, or `.literal(.varRef)`, from
+            // a preceding `PushVarRef` — both convert to the same
+            // `Expression.identifier` shape, just via different bytecode
+            // paths). `readVar`'s field/member-variable case (and any other
+            // shape) has no simple name to use this way, and is left as
+            // `objCallV4` rather than forced into a shape that would
+            // round-trip to something else entirely.
+            let objName: String?
+            switch obj {
+            case .variable(let name): objName = name
+            case .literal(let datum) where datum.datumType == .varRef: objName = datum.stringValue
+            default: objName = nil
+            }
+            if let objName {
+                return .functionCall(
+                    target: nil, name: objName, arguments: argListItems(args, syntax: syntax))
+            }
             return .objCallV4(obj: obj.asExpression(syntax: syntax), args: args.asExpression(syntax: syntax))
 
         case .newObj(let objType, let args):
