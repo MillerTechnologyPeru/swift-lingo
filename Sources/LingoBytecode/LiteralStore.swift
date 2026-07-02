@@ -42,13 +42,7 @@ public struct LiteralStore: Equatable, Sendable {
 
     public init(parsing recordSpan: inout ParserSpan, dataSpan: borrowing ParserSpan) throws(any Error) {
         let record = try LiteralStoreRecord(parsing: &recordSpan)
-        let data: LiteralValue
-        switch record.literalType {
-        case .int:
-            data = .int(Int32(record.offset))
-        default:
-            data = try Self.readData(from: dataSpan, record: record)
-        }
+        let data = try Self.readData(from: dataSpan, record: record)
         self.record = record
         self.data = data
     }
@@ -57,6 +51,9 @@ public struct LiteralStore: Equatable, Sendable {
         from dataSpan: borrowing ParserSpan,
         record: LiteralStoreRecord
     ) throws(any Error) -> LiteralValue {
+        if record.literalType == .int {
+            return .int(Int32(bitPattern: UInt32(record.offset)))
+        }
         return try dataSpan.withUnsafeBytes { rawBuffer in
             let offsetInBuffer = record.offset
             guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
