@@ -16,6 +16,7 @@ open class HarnessHost: LingoVMHost {
     public var makeObjectHandler: ((String, [LingoValue]) -> LingoObject?)?
     public var spriteIntersectsHandler: ((LingoObject, LingoObject) -> Bool)?
     public var spriteWithinHandler: ((LingoObject, LingoObject) -> Bool)?
+    public var hiliteHandler: ((LingoObject, String, LingoValue, LingoValue) -> Void)?
 
     public init(environment: LingoEnvironment, movie: LingoObject? = nil) {
         self.movie = movie ?? HarnessObject(environment: environment)
@@ -56,5 +57,9 @@ open class HarnessHost: LingoVMHost {
 
     public func spriteWithin(_ a: LingoObject, _ b: LingoObject) -> Bool {
         spriteWithinHandler?(a, b) ?? false
+    }
+
+    public func hilite(_ member: LingoObject, type: String, first: LingoValue, last: LingoValue) {
+        hiliteHandler?(member, type, first, last)
     }
 }
