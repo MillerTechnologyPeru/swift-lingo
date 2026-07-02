@@ -1,9 +1,8 @@
 import Testing
 import LingoBytecode
 import LingoRuntime
-import LingoVM
 
-@testable import LingoVMHarness
+@testable import LingoVM
 
 @Test func repeatWhileLoopExecutesTheCorrectNumberOfIterations() throws {
     // local i = 0

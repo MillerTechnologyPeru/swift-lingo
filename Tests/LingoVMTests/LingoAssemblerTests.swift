@@ -1,9 +1,8 @@
 import Testing
 import LingoBytecode
 import LingoRuntime
-import LingoVM
 
-@testable import LingoVMHarness
+@testable import LingoVM
 
 /// Builds a `handler`'s assembled bytecode into a minimal `ScriptChunk` and
 /// runs it through `LingoVM.call`, so each fixture only needs to state its
