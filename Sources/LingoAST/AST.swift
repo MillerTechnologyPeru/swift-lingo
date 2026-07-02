@@ -61,7 +61,6 @@ public indirect enum Expression: Equatable {
     case argListNoRet([Expression])
 
     case functionCall(target: Expression?, name: String, arguments: [Expression])  // obj.method(args) or function(args)
-    case objCall(name: String, args: Expression)
     case objCallV4(obj: Expression, args: Expression)
 
     case binaryOperation(left: Expression, operator: BinaryOperator, right: Expression)
