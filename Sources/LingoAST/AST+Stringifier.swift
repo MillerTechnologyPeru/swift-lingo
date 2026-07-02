@@ -234,7 +234,6 @@ extension Expression {
                 return "\(await target.toLingoSource(syntax: syntax)).\(name)(\(argStr))"
             }
             return "\(name)(\(argStr))"
-        case .call(let name, let args): return "\(name) \(await args.toLingoSource(syntax: syntax))"
         case .objCall(let name, let args): return ".\(name) \(await args.toLingoSource(syntax: syntax))"
         case .objCallV4(let obj, let args): return "\(await obj.toLingoSource(syntax: syntax))(\(await args.toLingoSource(syntax: syntax)))"
         case .binaryOperation(let left, let op, let right):

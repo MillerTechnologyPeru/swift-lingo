@@ -555,7 +555,7 @@ public final class LingoTranspiler {
                     return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
                 }
             }
-        case .call(let name, let argExpr), .objCall(let name, let argExpr):
+        case .objCall(let name, let argExpr):
             let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
             return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
         case .objCallV4(let obj, let argExpr):

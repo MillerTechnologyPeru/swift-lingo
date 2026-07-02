@@ -142,8 +142,21 @@ extension AstNode {
                 spriteId: spriteID.asExpression(syntax: syntax), prop: PropertyNames.spriteProperty(prop))
 
         case .call(let name, let args):
-            return .call(name: name, args: args.asExpression(syntax: syntax))
+            // `LocalCall`/`ExtCall`/`TellCall` always push their arguments as
+            // a single `argList`/`argListNoRet` node; unwrap it to the plain
+            // array `functionCall` expects. `LingoParser` never produces a
+            // dedicated "bare call" expression of its own — parenthesized
+            // call syntax always parses to `functionCall(target: nil, ...)`
+            // regardless of whether the call is used for its value or as a
+            // standalone statement — so this is the only shape a decompiled
+            // call can round-trip through source text as.
+            return .functionCall(target: nil, name: name, arguments: argListItems(args, syntax: syntax))
 
+        // `objCall`/`objCallV4` have the same round-trip gap `call` had
+        // (`LingoParser` has no production that yields either shape), left
+        // unaddressed for now since unlike a plain call, remapping them onto
+        // `functionCall` requires deciding what `target` should be from an
+        // opcode operand that only carries a method name, not a receiver.
         case .objCall(let name, let args):
             return .objCall(name: name, args: args.asExpression(syntax: syntax))
 
@@ -248,6 +261,18 @@ extension AstNode {
         default:
             return .expressionStatement(asExpression(syntax: syntax))
         }
+    }
+}
+
+/// Unwraps a `call`'s pushed-argument-list node down to its plain element
+/// array, since `LingoAST.Expression.functionCall`'s `arguments` is `[Expression]`
+/// rather than a nested `argList`/`argListNoRet` node.
+private func argListItems(_ args: AstNode, syntax: LingoSyntax) -> [Expression] {
+    switch args.asExpression(syntax: syntax) {
+    case .argList(let items), .argListNoRet(let items):
+        return items
+    case let other:
+        return [other]
     }
 }
 
