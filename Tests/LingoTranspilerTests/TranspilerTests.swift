@@ -49,6 +49,24 @@ struct TranspilerTests {
         #expect(result.contains("default:"))
         #expect(result.contains("return LingoValue.integer(0)"))
     }
+    @Test
+    func testChunkDeleteRoutesThroughTheSameAssignmentAsPuttingAnEmptyString() async {
+        let deleteSource = """
+            on eval x
+                delete word 2 of x
+            end
+            """
+        let putSource = """
+            on eval x
+                put "" into word 2 of x
+            end
+            """
+        let deleteResult = await transpile(deleteSource)
+        let putResult = await transpile(putSource)
+        #expect(!deleteResult.contains("callGlobal(\"delete\""))
+        #expect(deleteResult.contains(putResult.split(separator: "\n").first { $0.contains("settingChunk") } ?? "MISSING"))
+    }
+
     private func transpileExpr(_ source: String, locals: Set<String> = [], isMethod: Bool = false) async -> String {
         var lexer = Lexer(input: source)
         let tokens = lexer.tokenize()
