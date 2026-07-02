@@ -1,20 +1,30 @@
 // swift-tools-version: 6.3
 import PackageDescription
+import Foundation
+
+func isSet(_ key: String) -> Bool {
+    ProcessInfo.processInfo.environment[key] != nil
+}
 
 let package = Package(
     name: "SwiftLingo",
+    platforms: [
+        .macOS(.v14)
+    ],
     products: [
         .executable(name: "swiftlingoc", targets: ["swiftlingoc"]),
         .plugin(name: "LingoTranspilerPlugin", targets: ["LingoTranspilerPlugin"]),
         .library(name: "LingoTranspiler", targets: ["LingoTranspiler"]),
         .library(name: "LingoRuntime", targets: ["LingoRuntime"]),
         .library(name: "LingoAST", targets: ["LingoAST"]),
-        .library(name: "LingoParser", targets: ["LingoParser"])
+        .library(name: "LingoParser", targets: ["LingoParser"]),
+        .library(name: "LingoBytecode", targets: ["LingoBytecode"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", .upToNextMinor(from: "0.4.0")),
-        .package(url: "https://github.com/apple/swift-system", from: "1.5.0")
+        .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-binary-parsing", from: "0.0.1")
     ],
     targets: [
         // AST
@@ -66,6 +76,20 @@ let package = Package(
             name: "LingoTranspilerPlugin",
             capability: .buildTool(),
             dependencies: ["swiftlingoc"]
+        ),
+        // Bytecode
+        .target(
+            name: "LingoBytecode",
+            dependencies: [
+                "LingoAST",
+                .product(name: "BinaryParsing", package: "swift-binary-parsing")
+            ],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        .testTarget(
+            name: "LingoBytecodeTests",
+            dependencies: ["LingoBytecode"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         // Embedded Runtime (Library)
         .target(

@@ -1,3 +1,9 @@
+// `canImport(Foundation)` alone isn't enough: the SDK's Foundation module
+// exists textually even under Embedded, but fails to build there since
+// Embedded disables ObjC interop, which Foundation's headers require. This
+// whole file is display/debug-only, so it's fine for it to simply not exist
+// under Embedded rather than needing a fallback.
+#if canImport(Foundation) && !hasFeature(Embedded)
 import Foundation
 
 extension Script {
@@ -279,3 +285,4 @@ extension Expression {
         }
     }
 }
+#endif
