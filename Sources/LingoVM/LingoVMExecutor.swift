@@ -506,11 +506,9 @@ final class LingoVMExecutor {
     /// it would silently do the wrong thing on the rare occasion `args[0]`
     /// happens to itself be an ordinary object.
     ///
-    /// `hilite`/`setProp`'s double-index-range form are still deferred with
-    /// an explicit no-op for unrelated reasons: `hilite` needs a host hook
-    /// carrying position information that doesn't exist yet, and `setProp`'s
-    /// range form needs a
-    /// `LingoValue` range-assignment primitive that doesn't exist yet.
+    /// `hilite` is still deferred with an explicit no-op — it needs a host
+    /// hook carrying position information (which field/range to highlight)
+    /// that doesn't exist yet.
     private func dispatchObjCall(method: String, argList: LingoValue) -> LingoValue {
         let args = argList.asSequence()
         let nargs = args.count
@@ -535,6 +533,13 @@ final class LingoVMExecutor {
                 object.getProperty(propName).setElement(index: args[2], value: args[3])
                 return .void
             }
+        case ("setProp", 5):
+            if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
+                let current = object.getProperty(propName)
+                object.setProperty(
+                    propName, value: current.settingRange(start: args[2], end: args[3], value: args[4]))
+                return .void
+            }
         case ("delete", 1):
             // No separate chunk-range operands travel with this shape
             // (unlike the dedicated `DeleteChunk` opcode, which pops its own
@@ -555,7 +560,7 @@ final class LingoVMExecutor {
                 }
             }
             return .void
-        case ("hilite", 1), ("setProp", 5):
+        case ("hilite", 1):
             return .void
         default:
             break
