@@ -76,10 +76,132 @@ final class LingoVMExecutor {
     /// are visible rather than producing quietly-wrong results.
     func step() throws -> StepResult {
         let bytecode = handler.bytecodeArray[bytecodeIndex]
+        let obj = bytecode.obj
+
         switch bytecode.opcode {
+        case .pushZero:
+            push(.integer(0))
+
+        case .pushInt8, .pushInt16, .pushInt32:
+            push(.integer(Int(obj)))
+
+        case .pushFloat32:
+            let bits = UInt32(truncatingIfNeeded: obj)
+            push(.float(Double(Float(bitPattern: bits))))
+
+        case .pushCons:
+            let literalId = Int(UInt32(truncatingIfNeeded: obj) / multiplier)
+            push(literalValue(at: literalId))
+
+        case .pushSymb:
+            push(.symbol(getName(obj)))
+
+        case .pushList:
+            let list = try pop()
+            push(.list(list.asSequence()))
+
+        case .pushPropList:
+            let list = try pop()
+            push(.propertyList(propertyListEntries(from: list)))
+
+        case .pushArgList:
+            push(.list(try popArguments(count: Int(obj))))
+
+        case .pushArgListNoRet:
+            push(.list(try popArguments(count: Int(obj))))
+
+        case .peek:
+            let depthFromTop = Int(obj)
+            guard depthFromTop < stack.count else { throw LingoVMError.stackUnderflow }
+            push(stack[stack.count - 1 - depthFromTop])
+
+        case .pop:
+            let count = Int(obj)
+            guard stack.count >= count else { throw LingoVMError.stackUnderflow }
+            stack.removeLast(count)
+
+        case .swap:
+            guard stack.count >= 2 else { throw LingoVMError.stackUnderflow }
+            stack.swapAt(stack.count - 1, stack.count - 2)
+
+        case .mul:
+            let b = try pop()
+            let a = try pop()
+            push(a * b)
+
+        case .add:
+            let b = try pop()
+            let a = try pop()
+            push(a + b)
+
+        case .sub:
+            let b = try pop()
+            let a = try pop()
+            push(a - b)
+
+        case .div:
+            let b = try pop()
+            let a = try pop()
+            push(a / b)
+
+        case .mod:
+            let b = try pop()
+            let a = try pop()
+            push(a % b)
+
+        case .inv:
+            let a = try pop()
+            push(-a)
+
+        case .not:
+            let a = try pop()
+            push(.integer(a.asBool() ? 0 : 1))
+
+        case .and:
+            let b = try pop()
+            let a = try pop()
+            push(.integer(a.asBool() && b.asBool() ? 1 : 0))
+
+        case .or:
+            let b = try pop()
+            let a = try pop()
+            push(.integer(a.asBool() || b.asBool() ? 1 : 0))
+
+        case .lt:
+            let b = try pop()
+            let a = try pop()
+            push(a < b)
+
+        case .ltEq:
+            let b = try pop()
+            let a = try pop()
+            push(a <= b)
+
+        case .gt:
+            let b = try pop()
+            let a = try pop()
+            push(a > b)
+
+        case .gtEq:
+            let b = try pop()
+            let a = try pop()
+            push(a >= b)
+
+        case .eq:
+            let b = try pop()
+            let a = try pop()
+            push(a == b)
+
+        case .ntEq:
+            let b = try pop()
+            let a = try pop()
+            push(a != b)
+
         default:
             throw LingoVMError.unknownOpcode(bytecode.opcode)
         }
+
+        return .advance
     }
 
     // MARK: - Stack helpers
@@ -91,5 +213,51 @@ final class LingoVMExecutor {
 
     func push(_ value: LingoValue) {
         stack.append(value)
+    }
+
+    /// Pops `count` values in reverse push order, restoring left-to-right
+    /// argument order (the last-pushed argument is popped first).
+    private func popArguments(count: Int) throws -> [LingoValue] {
+        var args: [LingoValue] = []
+        args.reserveCapacity(count)
+        for _ in 0..<count {
+            args.append(try pop())
+        }
+        return args.reversed()
+    }
+
+    /// A property list is a flat, alternating key/value sequence on the
+    /// stack (`Datum::PropList` in the literal pool follows the same shape).
+    private func propertyListEntries(from value: LingoValue) -> [(key: LingoValue, value: LingoValue)] {
+        let items = value.asSequence()
+        var entries: [(key: LingoValue, value: LingoValue)] = []
+        var i = 0
+        while i + 1 < items.count {
+            entries.append((key: items[i], value: items[i + 1]))
+            i += 2
+        }
+        return entries
+    }
+
+    // MARK: - Name / literal resolution
+
+    func getName(_ id: Int64) -> String {
+        names[safe: Int(id)] ?? "UNKNOWN_\(id)"
+    }
+
+    private func literalValue(at index: Int) -> LingoValue {
+        guard let literal = chunk.literals[safe: index] else { return .void }
+        switch literal {
+        case .string(let s): return .string(s)
+        case .int(let i): return .integer(Int(i))
+        case .double(let f): return .float(f)
+        case .invalid, .javascript: return .void
+        }
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
