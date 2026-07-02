@@ -1,4 +1,9 @@
+// `canImport(Foundation)` alone isn't enough: the SDK's Foundation module
+// exists textually even under Embedded, but fails to build there since
+// Embedded disables ObjC interop, which Foundation's headers require.
+#if canImport(Foundation) && !hasFeature(Embedded)
 import Foundation
+#endif
 import BinaryParsing
 
 public enum LiteralType: UInt32, Equatable, Sendable {
@@ -74,10 +79,14 @@ public struct LiteralStore: Equatable, Sendable {
                     _unsafeBytes: UnsafeRawBufferPointer(
                         rebasing: rawBuffer[offsetInBuffer + 4..<stringEnd]))
                 let stringBytes = try [UInt8](parsing: &stringSpan, byteCount: stringByteCount)
+                #if canImport(Foundation) && !hasFeature(Embedded)
                 if let decoded = String(bytes: stringBytes, encoding: .ascii) {
                     return .string(decoded)
                 }
                 return .invalid
+                #else
+                return .string(String(decoding: stringBytes, as: Unicode.ASCII.self))
+                #endif
             case .float:
                 if length == 8 {
                     let doubleEnd = offsetInBuffer + 12
