@@ -5,12 +5,22 @@
 @dynamicMemberLookup
 @dynamicCallable
 open class LingoObject {
-    public init() {}
+    // Named to avoid colliding with Lingo's own built-in `the environment`
+    // system property: if this were a plain `environment` stored property,
+    // `self.\`environment\`` in generated code (or any dynamic-member access
+    // Lingo scripts write as "the environment") would resolve directly to
+    // this property instead of falling through `@dynamicMemberLookup` to
+    // `getProperty`/global lookup, silently breaking `the environment`.
+    public let lingoEnvironment: LingoEnvironment
+
+    public init(environment: LingoEnvironment) {
+        self.lingoEnvironment = environment
+    }
 
     open func getProperty(_ name: String) -> LingoValue { return .void }
     open func setProperty(_ name: String, value: LingoValue) {}
     open func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {
-        return LingoEnvironment.shared.callGlobal(name, args: args)
+        return lingoEnvironment.callGlobal(name, args: args)
     }
 
     public subscript(dynamicMember member: String) -> LingoValue {
@@ -18,7 +28,7 @@ open class LingoObject {
             let prop = getProperty(member)
             if case .void = prop {} else { return prop }
 
-            let glob = LingoEnvironment.shared.getGlobal(member)
+            let glob = lingoEnvironment.getGlobal(member)
             if case .void = glob {} else { return glob }
 
             return .boundMethod(self, member)

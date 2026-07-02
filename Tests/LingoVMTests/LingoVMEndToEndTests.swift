@@ -53,7 +53,7 @@ import LingoRuntime
         0x01  // 40: Ret
     ]
 
-    let receiver = TestReceiver()
+    let receiver = TestReceiver(environment: LingoEnvironment())
     let executor = try makeExecutor(
         bytes: bytes, names: ["result"], args: [.integer(5)], localCount: 2, receiver: receiver,
         handlers: [doubleHandler])
@@ -70,7 +70,7 @@ import LingoRuntime
     //   return (the floatPrecision) + (the locH of sprite 1)
     // end
     let host = TestHost()
-    let sprite = TestReceiver()
+    let sprite = TestReceiver(environment: LingoEnvironment())
     host.sprites[1] = sprite
 
     let bytes: [UInt8] = [

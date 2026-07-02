@@ -13,6 +13,7 @@ final class LingoVMExecutor {
     let receiver: LingoObject?
     var args: [LingoValue]
     let host: LingoVMHost?
+    let environment: LingoEnvironment
     let version: UInt16
     let multiplier: UInt32
     let depth: Int
@@ -30,6 +31,7 @@ final class LingoVMExecutor {
         args: [LingoValue],
         receiver: LingoObject?,
         host: LingoVMHost?,
+        environment: LingoEnvironment,
         version: UInt16,
         multiplier: UInt32,
         depth: Int
@@ -40,6 +42,7 @@ final class LingoVMExecutor {
         self.args = args
         self.receiver = receiver
         self.host = host
+        self.environment = environment
         self.version = version
         self.multiplier = multiplier
         self.depth = depth
@@ -198,10 +201,10 @@ final class LingoVMExecutor {
             push(a != b)
 
         case .getGlobal, .getGlobal2:
-            push(LingoEnvironment.shared.getGlobal(getName(obj)))
+            push(environment.getGlobal(getName(obj)))
 
         case .setGlobal, .setGlobal2:
-            LingoEnvironment.shared.setGlobal(getName(obj), try pop())
+            environment.setGlobal(getName(obj), try pop())
 
         case .getProp:
             push(receiver?.getProperty(getName(obj)) ?? .void)
@@ -232,7 +235,7 @@ final class LingoVMExecutor {
         case .getTopLevelProp:
             // Not distinguished from a plain global lookup — the decompiler
             // doesn't distinguish it from `Var` either.
-            push(LingoEnvironment.shared.getGlobal(getName(obj)))
+            push(environment.getGlobal(getName(obj)))
 
         case .pushVarRef:
             // Pushes the variable's *name*, not its value — matching the
@@ -281,8 +284,8 @@ final class LingoVMExecutor {
             }
             let result = try LingoVM.call(
                 handler: targetHandler, chunk: chunk, names: names, args: argList.asSequence(),
-                receiver: receiver, host: host, version: version, multiplier: multiplier,
-                depth: depth + 1)
+                receiver: receiver, host: host, environment: environment, version: version,
+                multiplier: multiplier, depth: depth + 1)
             push(result)
 
         case .extCall, .tellCall:
@@ -292,7 +295,7 @@ final class LingoVMExecutor {
             // named-global dispatch.
             let name = getName(obj)
             let argList = try pop()
-            push(LingoEnvironment.shared.callGlobal(name, args: argList.asSequence()))
+            push(environment.callGlobal(name, args: argList.asSequence()))
 
         case .objCallV4:
             let argList = try pop()
@@ -807,7 +810,7 @@ final class LingoVMExecutor {
 
     private func readVariable(_ target: VariableTarget) -> LingoValue {
         switch target {
-        case .global(let name): return LingoEnvironment.shared.getGlobal(name)
+        case .global(let name): return environment.getGlobal(name)
         case .property(let name): return receiver?.getProperty(name) ?? .void
         case .argument(let index): return args[safe: index] ?? .void
         case .local(let index): return locals[safe: index] ?? .void
@@ -818,7 +821,7 @@ final class LingoVMExecutor {
     private func writeVariable(_ target: VariableTarget, value: LingoValue) {
         switch target {
         case .global(let name):
-            LingoEnvironment.shared.setGlobal(name, value)
+            environment.setGlobal(name, value)
         case .property(let name):
             receiver?.setProperty(name, value: value)
         case .argument(let index):

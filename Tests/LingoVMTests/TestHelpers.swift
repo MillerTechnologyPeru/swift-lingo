@@ -31,7 +31,8 @@ func makeExecutor(
     localCount: Int = 0,
     receiver: LingoObject? = nil,
     host: LingoVMHost? = nil,
-    handlers: [HandlerDef] = []
+    handlers: [HandlerDef] = [],
+    environment: LingoEnvironment = LingoEnvironment()
 ) throws -> LingoVMExecutor {
     let bytecodeArray = try bytes.withParserSpan { span -> [Bytecode] in
         var array: [Bytecode] = []
@@ -48,7 +49,7 @@ func makeExecutor(
         propertyDefaults: [:])
     return LingoVMExecutor(
         handler: handler, chunk: chunk, names: names, args: args, receiver: receiver, host: host,
-        version: 500, multiplier: 8, depth: 0)
+        environment: environment, version: 500, multiplier: 8, depth: 0)
 }
 
 /// A minimal `LingoObject` subclass for exercising property/method dispatch
@@ -75,11 +76,15 @@ final class TestReceiver: LingoObject {
 /// exposing a `TestReceiver` as the movie, for testing property dispatch
 /// that needs a host without any real Director runtime behind it.
 final class TestHost: LingoVMHost {
-    let movieObject = TestReceiver()
+    let movieObject: TestReceiver
     var sprites: [Int: LingoObject] = [:]
     var members: [Int: LingoObject] = [:]
     var intersects = false
     var within = false
+
+    init(environment: LingoEnvironment = LingoEnvironment()) {
+        movieObject = TestReceiver(environment: environment)
+    }
 
     var movie: LingoObject { movieObject }
 

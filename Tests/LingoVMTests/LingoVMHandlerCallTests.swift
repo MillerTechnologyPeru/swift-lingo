@@ -35,7 +35,8 @@ import LingoRuntime
 }
 
 @Test func extCallDispatchesToRegisteredGlobalFunction() throws {
-    LingoEnvironment.shared.registerGlobalFunction("vmTestExtCallTimesTen") { args in
+    let environment = LingoEnvironment()
+    environment.registerGlobalFunction("vmTestExtCallTimesTen") { args in
         guard case .integer(let v) = args.first ?? .void else { return .void }
         return .integer(v * 10)
     }
@@ -47,7 +48,7 @@ import LingoRuntime
             0x57, 0x00,  // ExtCall vmTestExtCallTimesTen
             0x01  // Ret
         ],
-        names: ["vmTestExtCallTimesTen"])
+        names: ["vmTestExtCallTimesTen"], environment: environment)
     let result = try executor.run()
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(40)))
@@ -97,8 +98,9 @@ import LingoRuntime
 }
 
 @Test func objCallFallsBackToReceiverCallMethod() throws {
-    let receiver = TestReceiver()
-    LingoEnvironment.shared.setGlobal("vmTestObjCallReceiver", .object(receiver))
+    let environment = LingoEnvironment()
+    let receiver = TestReceiver(environment: environment)
+    environment.setGlobal("vmTestObjCallReceiver", .object(receiver))
 
     let executor = try makeExecutor(
         bytes: [
@@ -108,7 +110,7 @@ import LingoRuntime
             0x67, 0x01,  // ObjCall greet
             0x01  // Ret
         ],
-        names: ["vmTestObjCallReceiver", "greet"])
+        names: ["vmTestObjCallReceiver", "greet"], environment: environment)
     let result = try executor.run()
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .string("called:greet")))
@@ -117,8 +119,9 @@ import LingoRuntime
 }
 
 @Test func objCallV4DispatchesThroughGlobalFunctionValue() throws {
-    LingoEnvironment.shared.registerGlobalFunction("vmTestObjCallV4Target") { _ in .integer(99) }
-    LingoEnvironment.shared.setGlobal("vmTestObjCallV4Fn", .globalFunction("vmTestObjCallV4Target"))
+    let environment = LingoEnvironment()
+    environment.registerGlobalFunction("vmTestObjCallV4Target") { _ in .integer(99) }
+    environment.setGlobal("vmTestObjCallV4Fn", .globalFunction(environment, "vmTestObjCallV4Target"))
 
     let executor = try makeExecutor(
         bytes: [
@@ -127,7 +130,7 @@ import LingoRuntime
             0x58, 0x01,  // ObjCallV4 varType=1 (global/property passthrough)
             0x01  // Ret
         ],
-        names: ["vmTestObjCallV4Fn"])
+        names: ["vmTestObjCallV4Fn"], environment: environment)
     let result = try executor.run()
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(99)))

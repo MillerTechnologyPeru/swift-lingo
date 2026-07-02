@@ -5,7 +5,7 @@ import LingoRuntime
 
 @Test func newObjInstantiatesThroughHost() throws {
     let host = TestHost()
-    let created = TestReceiver()
+    let created = TestReceiver(environment: LingoEnvironment())
     // A host resolving any script name to the same pre-built instance is
     // enough to prove NewObj routes through `makeObject` rather than trying
     // to construct anything itself.
@@ -78,7 +78,7 @@ import LingoRuntime
 /// A host that always resolves `makeObject` to a fixed instance, regardless
 /// of script name or arguments.
 private final class InstantiatingHost: LingoVMHost {
-    let movie: LingoObject = TestReceiver()
+    let movie: LingoObject = TestReceiver(environment: LingoEnvironment())
     let objectToReturn: LingoObject
 
     init(objectToReturn: LingoObject) {

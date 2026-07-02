@@ -6,8 +6,8 @@ import LingoRuntime
 @testable import LingoVM
 
 @Test func globalSetThenGetRoundTrips() throws {
-    // Use a test-unique name so this doesn't collide with other tests
-    // sharing `LingoEnvironment.shared`.
+    // `makeExecutor` defaults `environment:` to a fresh `LingoEnvironment()`
+    // per call, so this test's globals are isolated from every other test's.
     let executor = try makeExecutor(
         bytes: [
             0x41, 0x2a,  // PushInt8 42
@@ -57,7 +57,7 @@ import LingoRuntime
 }
 
 @Test func propGetSetDispatchesToReceiver() throws {
-    let receiver = TestReceiver()
+    let receiver = TestReceiver(environment: LingoEnvironment())
     let executor = try makeExecutor(
         bytes: [
             0x41, 0x09,  // PushInt8 9

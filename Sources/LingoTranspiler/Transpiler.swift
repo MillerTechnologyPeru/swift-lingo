@@ -167,11 +167,23 @@ public final class LingoTranspiler {
         activeHandlerIsInitializer = isInitializer
         var output = ""
         let functionIndent = isMethod ? "    " : ""
-        let swiftArgs = args.filter { $0.lowercased() != "me" }.map { "_ `\($0.lowercased())`: LingoValue = LingoValue.void" }.joined(separator: ", ")
+        let baseArgs = args.filter { $0.lowercased() != "me" }.map { "_ `\($0.lowercased())`: LingoValue = LingoValue.void" }
+        // A regular method reaches the environment via `self.lingoEnvironment`
+        // once constructed, so it needs no parameter of its own. An
+        // initializer (there's nothing to call `self.lingoEnvironment` on
+        // yet) and a movie-level free function (no `self` at all) both need
+        // it passed in explicitly, ahead of the Lingo-side arguments.
+        let needsEnvironmentParam = !isMethod || isInitializer
+        let swiftArgs = (needsEnvironmentParam ? ["environment: LingoEnvironment"] + baseArgs : baseArgs)
+            .joined(separator: ", ")
         if isInitializer {
-            let overrideKeyword = swiftArgs.isEmpty ? "override " : ""
+            // Only an override when the generated signature is exactly
+            // `init(environment:)`, matching `LingoObject`'s sole designated
+            // initializer — any additional Lingo-side argument makes this a
+            // new initializer overload instead.
+            let overrideKeyword = baseArgs.isEmpty ? "override " : ""
             output += "\(functionIndent)public \(overrideKeyword)init(\(swiftArgs)) {\n"
-            output += "\(functionIndent)    super.init()\n"
+            output += "\(functionIndent)    super.init(environment: environment)\n"
         } else {
             let funcName = isMethod ? "`\(name)`" : "lingo_\(name)"
             output += "\(functionIndent)public func \(funcName)(\(swiftArgs)) -> LingoValue {\n"
@@ -366,7 +378,7 @@ public final class LingoTranspiler {
         case .pass:
             // Notify the runtime, then halt the current handler: per Lingo
             // semantics, no statements following `pass` execute.
-            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"pass\", args: [])\n"
+            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"pass\", args: [])\n"
             output += activeHandlerIsInitializer ? "\(indent)return\n" : "\(indent)return .void\n"
         case .caseStatement(let cond, let cases, let otherwise):
             let condStr = await transpile(expression: cond, locals: locals, isMethod: isMethod)
@@ -404,7 +416,7 @@ public final class LingoTranspiler {
             }
             output += "\(indent)}\n"
         case .when(let event, let script):
-            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"when\", args: [.string(\"\(escapeSwiftString(event))\"), .string(\"\(escapeSwiftString(script))\")])\n"
+            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"when\", args: [.string(\"\(escapeSwiftString(event))\"), .string(\"\(escapeSwiftString(script))\")])\n"
         case .soundCmd(let cmd, let args):
             let argsStr: String
             if let args {
@@ -412,7 +424,7 @@ public final class LingoTranspiler {
             } else {
                 argsStr = ".void"
             }
-            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"\(escapeSwiftString(cmd))\", args: [\(argsStr)])\n"
+            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"\(escapeSwiftString(cmd))\", args: [\(argsStr)])\n"
         case .playCmd(let args):
             let argsStr: String
             if let args {
@@ -420,13 +432,13 @@ public final class LingoTranspiler {
             } else {
                 argsStr = ".void"
             }
-            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"play\", args: [\(argsStr)])\n"
+            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"play\", args: [\(argsStr)])\n"
         case .chunkHilite(let chunk):
             let chunkStr = await transpile(expression: chunk, locals: locals, isMethod: isMethod)
-            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"hilite\", args: [\(chunkStr)])\n"
+            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"hilite\", args: [\(chunkStr)])\n"
         case .chunkDelete(let chunk):
             let chunkStr = await transpile(expression: chunk, locals: locals, isMethod: isMethod)
-            output += "\(indent)_ = LingoEnvironment.shared.callGlobal(\"delete\", args: [\(chunkStr)])\n"
+            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"delete\", args: [\(chunkStr)])\n"
         }
         return output
     }
@@ -447,7 +459,7 @@ public final class LingoTranspiler {
             } else if isMethod && activeProperties.contains(lower) {
                 output += "\(indent)self.`\(name)` = \(valStr)\n"
             } else {
-                output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
+                output += "\(indent)\(environmentRef(isMethod: isMethod)).setGlobal(\"\(name)\", \(valStr))\n"
             }
         } else if let memberProperty = await transpileMemberSpritePropertyAssignment(target: target, value: valStr, locals: locals, isMethod: isMethod) {
             output += "\(indent)\(memberProperty)\n"
@@ -459,7 +471,7 @@ public final class LingoTranspiler {
             let idxStr = await transpile(expression: indexExpr, locals: locals, isMethod: isMethod)
             output += "\(indent)\(objStr).setElement(index: \(idxStr), value: \(valStr))\n"
         } else if case .the(let name) = target {
-            output += "\(indent)LingoEnvironment.shared.setGlobal(\"\(name)\", \(valStr))\n"
+            output += "\(indent)\(environmentRef(isMethod: isMethod)).setGlobal(\"\(name)\", \(valStr))\n"
         } else if case .chunkExpression(let type, let first, let last, let string, _) = target {
             let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod)
             let lastStr: String
@@ -494,7 +506,8 @@ public final class LingoTranspiler {
         let propertyName = chain.properties[chain.properties.count - 1]
         var receiver =
             isMethod
-            ? "self.`sprite`(LingoValue.object(self).`spriteNum`).`member`" : "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoEnvironment.shared.getGlobal(\"spriteNum\")]).`member`"
+            ? "self.`sprite`(LingoValue.object(self).`spriteNum`).`member`"
+            : "\(environmentRef(isMethod: isMethod)).callGlobal(\"sprite\", args: [\(environmentRef(isMethod: isMethod)).getGlobal(\"spriteNum\")]).`member`"
         if chain.properties.count > 3 {
             for property in chain.properties.dropFirst(2).dropLast() {
                 receiver += ".`\(property)`"
@@ -532,9 +545,9 @@ public final class LingoTranspiler {
             if isMethod && activeProperties.contains(lower) {
                 return "self.`\(name)`"
             }
-            return "LingoEnvironment.shared.getGlobal(\"\(name)\")"
+            return "\(environmentRef(isMethod: isMethod)).getGlobal(\"\(name)\")"
         case .the(let prop):
-            return isMethod ? "self.`\(prop)`" : "LingoEnvironment.shared.getGlobal(\"\(prop)\")"
+            return isMethod ? "self.`\(prop)`" : "\(environmentRef(isMethod: isMethod)).getGlobal(\"\(prop)\")"
         case .propertyAccess(let target, let prop, _):
             let tStr = await transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr).`\(prop)`"
@@ -552,12 +565,12 @@ public final class LingoTranspiler {
                 if locals.contains(name.lowercased()) {
                     return "`\(name.lowercased())`(\(argStr))"  // LingoValue being called
                 } else {
-                    return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
+                    return isMethod ? "self.`\(name)`(\(argStr))" : "\(environmentRef(isMethod: isMethod)).callGlobal(\"\(name)\", args: [\(argStr)])"
                 }
             }
         case .objCall(let name, let argExpr):
             let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return isMethod ? "self.`\(name)`(\(argStr))" : "LingoEnvironment.shared.callGlobal(\"\(name)\", args: [\(argStr)])"
+            return isMethod ? "self.`\(name)`(\(argStr))" : "\(environmentRef(isMethod: isMethod)).callGlobal(\"\(name)\", args: [\(argStr)])"
         case .objCallV4(let obj, let argExpr):
             let objStr = await transpile(expression: obj, locals: locals, isMethod: isMethod, depth: depth + 1)
             let argStr = await transpile(expression: argExpr, locals: locals, isMethod: isMethod, depth: depth + 1)
@@ -650,31 +663,31 @@ public final class LingoTranspiler {
         case .spriteIntersects(let first, let second):
             let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
             let secondStr = await transpile(expression: second, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return "LingoEnvironment.shared.callGlobal(\"intersects\", args: [\(firstStr), \(secondStr)])"
+            return "\(environmentRef(isMethod: isMethod)).callGlobal(\"intersects\", args: [\(firstStr), \(secondStr)])"
         case .spriteWithin(let first, let second):
             let firstStr = await transpile(expression: first, locals: locals, isMethod: isMethod, depth: depth + 1)
             let secondStr = await transpile(expression: second, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return "LingoEnvironment.shared.callGlobal(\"within\", args: [\(firstStr), \(secondStr)])"
+            return "\(environmentRef(isMethod: isMethod)).callGlobal(\"within\", args: [\(firstStr), \(secondStr)])"
         case .menuProp(let menuId, let prop):
             let menuStr = await transpile(expression: menuId, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return "LingoEnvironment.shared.callGlobal(\"menu\", args: [\(menuStr)]).`\(prop)`"
+            return "\(environmentRef(isMethod: isMethod)).callGlobal(\"menu\", args: [\(menuStr)]).`\(prop)`"
         case .menuItemProp(let menuId, let itemId, let prop):
             let menuStr = await transpile(expression: menuId, locals: locals, isMethod: isMethod, depth: depth + 1)
             let itemStr = await transpile(expression: itemId, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return "LingoEnvironment.shared.callGlobal(\"menuItem\", args: [\(itemStr), \(menuStr)]).`\(prop)`"
+            return "\(environmentRef(isMethod: isMethod)).callGlobal(\"menuItem\", args: [\(itemStr), \(menuStr)]).`\(prop)`"
         case .soundProp(let soundId, let prop):
             let soundStr = await transpile(expression: soundId, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return "LingoEnvironment.shared.callGlobal(\"sound\", args: [\(soundStr)]).`\(prop)`"
+            return "\(environmentRef(isMethod: isMethod)).callGlobal(\"sound\", args: [\(soundStr)]).`\(prop)`"
         case .spriteProp(let spriteId, let prop):
             let spriteStr = await transpile(expression: spriteId, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return "LingoEnvironment.shared.callGlobal(\"sprite\", args: [\(spriteStr)]).`\(prop)`"
+            return "\(environmentRef(isMethod: isMethod)).callGlobal(\"sprite\", args: [\(spriteStr)]).`\(prop)`"
         case .member(let type, let id, _):
             let idStr = await transpile(expression: id, locals: locals, isMethod: isMethod, depth: depth + 1)
             let functionName = type.lowercased() == "sprite" ? "sprite" : "member"
-            return isMethod ? "self.`\(functionName)`(\(idStr))" : "LingoEnvironment.shared.callGlobal(\"\(functionName)\", args: [\(idStr)])"
+            return isMethod ? "self.`\(functionName)`(\(idStr))" : "\(environmentRef(isMethod: isMethod)).callGlobal(\"\(functionName)\", args: [\(idStr)])"
         case .newObj(let type, let args):
             let argsStr = await transpile(expression: args, locals: locals, isMethod: isMethod, depth: depth + 1)
-            return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "LingoEnvironment.shared.callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
+            return isMethod ? "self.`new`(.string(\"\(type)\"), \(argsStr))" : "\(environmentRef(isMethod: isMethod)).callGlobal(\"new\", args: [.string(\"\(type)\"), \(argsStr)])"
         case .range(let start, let end):
             let s = await transpile(expression: start, locals: locals, isMethod: isMethod, depth: depth + 1)
             let e = await transpile(expression: end, locals: locals, isMethod: isMethod, depth: depth + 1)
@@ -718,6 +731,17 @@ public final class LingoTranspiler {
         default:
             return 1
         }
+    }
+
+    /// The generated-code expression that reaches the movie's `LingoEnvironment`:
+    /// `self.lingoEnvironment` inside a `LingoObject` subclass method (where
+    /// `self` is available), or the bare `environment` parameter inside a
+    /// movie-level free function (which has no `self`). Deliberately not
+    /// named `self.environment` — Lingo has its own built-in `the environment`
+    /// system property, and `LingoObject`'s stored property is named
+    /// `lingoEnvironment` specifically to avoid shadowing it.
+    private func environmentRef(isMethod: Bool) -> String {
+        isMethod ? "self.lingoEnvironment" : "environment"
     }
 
     private func escapeSwiftString(_ value: String) -> String {
