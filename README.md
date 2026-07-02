@@ -1,6 +1,6 @@
 # SwiftLingo
 
-A Swift package that transpiles [Adobe Director](https://en.wikipedia.org/wiki/Adobe_Director) [Lingo](https://en.wikipedia.org/wiki/Lingo_(programming_language)) scripts (`.ls` files) to native Swift source code, along with a runtime library for executing the generated code.
+A Swift package for working with [Adobe Director](https://en.wikipedia.org/wiki/Adobe_Director) [Lingo](https://en.wikipedia.org/wiki/Lingo_(programming_language)) from Swift. It can parse `.ls` source, transpile it to native Swift, parse and decompile compiled Director bytecode, and execute bytecode directly through a small VM and host harness.
 
 ## Overview
 
@@ -8,18 +8,21 @@ Adobe Director used **Lingo**, a scripting language for interactive multimedia. 
 
 1. **Parsing** `.ls` Lingo source into a typed AST
 2. **Transpiling** the AST to Swift classes that extend `LingoObject`
-3. **Running** the generated code against a `LingoEnvironment` that bridges to your host application
+3. **Parsing and decompiling** compiled Director Lingo bytecode into the same AST shape
+4. **Running** generated Swift or bytecode against an explicit `LingoEnvironment` and host-provided objects
 
 ## Architecture
 
 ```
 SwiftLingo
-├── LingoAST          – AST node types (Script, Statement, Expression, …)
-├── LingoParser       – Lexer + Parser: .ls source → AST
-├── LingoTranspiler   – AST → Swift source (library)
-├── swiftlingoc       – CLI: swiftlingoc <input> <output-dir>
+├── LingoAST              – AST node types (Script, Statement, Expression, …)
+├── LingoParser           – Lexer + Parser: .ls source → AST
+├── LingoTranspiler       – AST → Swift source (library)
+├── swiftlingoc           – CLI: swiftlingoc <input> <output-dir>
 ├── LingoTranspilerPlugin – SPM build-tool plugin (runs swiftlingoc at build time)
-└── LingoRuntime      – LingoValue, LingoObject, LingoEnvironment
+├── LingoBytecode         – Director script chunks, opcodes, literals, and decompiler
+├── LingoRuntime          – LingoValue, LingoObject, LingoEnvironment
+└── LingoVM               – Bytecode interpreter, host protocol, and harness helpers
 ```
 
 ## How Transpilation Works
@@ -88,6 +91,18 @@ public class Button: LingoObject {
 
 Files whose names begin with `movie_` are treated as **movie scripts** and transpile to free functions (`lingo_<name>`) instead of class methods.
 
+## Bytecode Decompilation
+
+`LingoBytecode` reads Director script data structures, including script chunks, script context chunks, handler records, opcodes, property name ids, and literal stores. Its decompiler turns compiled handler bytecode back into `LingoAST.Statement` and `Expression` values, so source parsing and bytecode decompilation feed the same downstream AST model.
+
+Callers provide the movie's resolved name table when decompiling, because the flat `Lnam` chunk is a shared Director resource outside the Lingo-specific script chunk itself.
+
+## Bytecode VM
+
+`LingoVM` executes compiled `HandlerDef` bytecode directly using the same `LingoRuntime` value model as transpiled Swift. It is a stack-machine interpreter with explicit inputs for the handler, script chunk, name table, arguments, optional receiver, Director file version, and `LingoEnvironment`.
+
+Director-specific concepts are delegated through `LingoVMHost`: movie, sprite, member, menu, sound, window, object creation, sprite collision queries, and field highlighting. For tests and lightweight integrations, `HarnessHost`, `HarnessObject`, and `LingoAssembler` provide reusable host objects and bytecode-construction helpers without requiring a full Director runtime.
+
 ## Runtime
 
 `LingoRuntime` provides the types all generated code depends on:
@@ -96,9 +111,9 @@ Files whose names begin with `movie_` are treated as **movie scripts** and trans
 |---|---|
 | `LingoValue` | Tagged enum: `.void`, `.integer`, `.float`, `.string`, `.symbol`, `.list`, `.propertyList`, `.object`, `.boundMethod` |
 | `LingoObject` | Base class for transpiled scripts; uses `@dynamicMemberLookup` and `@dynamicCallable` |
-| `LingoEnvironment` | Singleton holding global variables and global function handlers |
+| `LingoEnvironment` | Instance-owned global variables and global function handlers; callers decide how to scope and share each environment |
 
-`LingoValue` implements the Lingo semantics you'd expect: 
+`LingoValue` implements the Lingo semantics you'd expect:
 - Case-insensitive string and symbol comparisons.
 - Native implicit type coercions for operators.
 - 1-based indexing for strings and lists.
@@ -138,7 +153,7 @@ Add `LingoTranspilerPlugin` to any target that contains `.ls` files and the tran
 .package(url: "https://github.com/MillerTechnologyPeru/swift-lingo", branch: "master"),
 ```
 
-Available products: `LingoRuntime`, `LingoAST`, `LingoParser`, `LingoTranspiler`, `LingoTranspilerPlugin`, `swiftlingoc`.
+Available products: `LingoRuntime`, `LingoAST`, `LingoParser`, `LingoTranspiler`, `LingoBytecode`, `LingoVM`, `LingoTranspilerPlugin`, `swiftlingoc`.
 
 ## Requirements
 

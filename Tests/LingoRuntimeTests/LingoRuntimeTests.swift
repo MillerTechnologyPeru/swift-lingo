@@ -510,6 +510,36 @@ struct LingoValueStringRangeTests {
         let result = s.getRange(start: .integer(1), end: .integer(100))
         #expect(LingoValue.equalsBool(lhs: result, rhs: .string("Hi")))
     }
+
+    @Test func settingRangeReplacesASpanAtTheSameBoundsGetRangeReads() {
+        let s: LingoValue = .string("Hello World")
+        let result = s.settingRange(start: .integer(1), end: .integer(5), value: .string("HELLO"))
+        #expect(LingoValue.equalsBool(lhs: result, rhs: .string("HELLO World")))
+    }
+
+    @Test func settingRangeReplacesAMiddleSpan() {
+        let s: LingoValue = .string("Hello World")
+        let result = s.settingRange(start: .integer(7), end: .integer(11), value: .string("Swift"))
+        #expect(LingoValue.equalsBool(lhs: result, rhs: .string("Hello Swift")))
+    }
+
+    @Test func settingRangeClampsBounds() {
+        let s: LingoValue = .string("Hi")
+        let result = s.settingRange(start: .integer(1), end: .integer(100), value: .string("Bye"))
+        #expect(LingoValue.equalsBool(lhs: result, rhs: .string("Bye")))
+    }
+
+    @Test func settingRangeBeyondTheStringAppends() {
+        let s: LingoValue = .string("Hi")
+        let result = s.settingRange(start: .integer(10), end: .integer(12), value: .string(" there"))
+        #expect(LingoValue.equalsBool(lhs: result, rhs: .string("Hi there")))
+    }
+
+    @Test func settingRangeOnNonStringIsANoOp() {
+        let v: LingoValue = .integer(42)
+        let result = v.settingRange(start: .integer(1), end: .integer(3), value: .string("x"))
+        #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(42)))
+    }
 }
 
 // MARK: - LingoValue Utilities Tests

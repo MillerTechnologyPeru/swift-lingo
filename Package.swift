@@ -104,10 +104,16 @@ let package = Package(
             dependencies: ["LingoRuntime"],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
-        // Virtual Machine (Library)
+        // Virtual Machine (Library) — includes a reusable LingoVMHost
+        // implementation and bytecode-assembler DSL (HarnessObject/
+        // HarnessHost/LingoAssembler) for exercising the VM without a real
+        // Director runtime.
         .target(
             name: "LingoVM",
-            dependencies: ["LingoBytecode", "LingoRuntime"],
+            dependencies: [
+                "LingoBytecode", "LingoRuntime",
+                .product(name: "BinaryParsing", package: "swift-binary-parsing")
+            ],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         .testTarget(

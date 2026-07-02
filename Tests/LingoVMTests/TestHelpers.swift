@@ -82,6 +82,7 @@ final class TestHost: LingoVMHost {
     var windows: [Int: LingoObject] = [:]
     var intersects = false
     var within = false
+    var lastHilite: (member: LingoObject, type: String, first: LingoValue, last: LingoValue)?
 
     init(environment: LingoEnvironment = LingoEnvironment()) {
         movieObject = TestReceiver(environment: environment)
@@ -106,4 +107,8 @@ final class TestHost: LingoVMHost {
 
     func spriteIntersects(_ a: LingoObject, _ b: LingoObject) -> Bool { intersects }
     func spriteWithin(_ a: LingoObject, _ b: LingoObject) -> Bool { within }
+
+    func hilite(_ member: LingoObject, type: String, first: LingoValue, last: LingoValue) {
+        lastHilite = (member, type, first, last)
+    }
 }

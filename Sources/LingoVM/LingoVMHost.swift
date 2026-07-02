@@ -22,6 +22,11 @@ public protocol LingoVMHost: AnyObject {
     func makeObject(scriptName: String, args: [LingoValue]) -> LingoObject?
     func spriteIntersects(_ a: LingoObject, _ b: LingoObject) -> Bool
     func spriteWithin(_ a: LingoObject, _ b: LingoObject) -> Bool
+    /// Highlights `type` (char/word/item/line) range `first...last` within
+    /// a live field member — the one Director-specific side effect
+    /// `hiliteChunk` needs that neither `LingoObject` nor `LingoEnvironment`
+    /// can express, since it's a UI effect with no corresponding property.
+    func hilite(_ member: LingoObject, type: String, first: LingoValue, last: LingoValue)
 }
 
 extension LingoVMHost {
@@ -33,4 +38,5 @@ extension LingoVMHost {
     public func makeObject(scriptName: String, args: [LingoValue]) -> LingoObject? { nil }
     public func spriteIntersects(_ a: LingoObject, _ b: LingoObject) -> Bool { false }
     public func spriteWithin(_ a: LingoObject, _ b: LingoObject) -> Bool { false }
+    public func hilite(_ member: LingoObject, type: String, first: LingoValue, last: LingoValue) {}
 }

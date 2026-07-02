@@ -104,6 +104,33 @@ import LingoRuntime
     #expect(LingoValue.equalsBool(lhs: result, rhs: .string("one  three")))
 }
 
+@Test func hiliteChunkDelegatesToHostWithTheFieldAndRange() throws {
+    let environment = LingoEnvironment()
+    let host = TestHost(environment: environment)
+    let field = TestReceiver(environment: environment)
+    host.members[1] = field
+
+    let executor = try makeExecutor(
+        bytes: [
+            0x03, 0x03,  // firstChar=0, lastChar=0
+            0x41, 0x02, 0x41, 0x02,  // firstWord=2, lastWord=2
+            0x03, 0x03,  // firstItem=0, lastItem=0
+            0x03, 0x03,  // firstLine=0, lastLine=0
+            0x41, 0x01,  // PushInt8 1 (fieldId)
+            0x03,  // PushZero (castId)
+            0x18,  // HiliteChunk
+            0x01  // Ret
+        ],
+        host: host, environment: environment)
+    _ = try executor.run()
+
+    let hilite = try #require(host.lastHilite)
+    #expect(hilite.member === field)
+    #expect(hilite.type == "word")
+    #expect(LingoValue.equalsBool(lhs: hilite.first, rhs: .integer(2)))
+    #expect(LingoValue.equalsBool(lhs: hilite.last, rhs: .integer(2)))
+}
+
 @Test func spriteCollisionOpcodesDelegateToHost() throws {
     let environment = LingoEnvironment()
     let host = TestHost()

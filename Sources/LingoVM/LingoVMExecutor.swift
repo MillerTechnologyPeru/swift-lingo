@@ -254,7 +254,11 @@ final class LingoVMExecutor {
             push(.symbol(getName(obj)))
 
         case .pushChunkVarRef:
-            push(try readVar(varType: obj))
+            // Unlike `readVar`, resolves to a write-back-capable reference
+            // (see `readVarReference`) — needed so `ObjCall` built-ins like
+            // `delete`/`setContents*` can mutate whatever this points to,
+            // not just read its current value.
+            push(try readVarReference(varType: obj))
 
         case .jmp:
             bytecodeIndex = try resolveJumpTarget(pos: bytecode.pos, offset: obj)
@@ -439,13 +443,12 @@ final class LingoVMExecutor {
             }
 
         case .hiliteChunk:
-            // A UI side effect (highlighting text in a live field member)
-            // with no meaningful return value and no host hook yet — the
-            // operands still have to be consumed for stack balance.
             let castId: LingoValue? = version >= 500 ? try pop() : nil
-            _ = castId
-            _ = try pop()  // fieldId
-            _ = try popChunkRangeSelector()
+            let fieldId = try pop()
+            let range = try popChunkRangeSelector()
+            if let range, let member = host?.member(fieldId, castLib: castId) {
+                host?.hilite(member, type: range.type, first: range.first, last: range.last)
+            }
 
         case .ontoSpr:
             let second = try pop()
@@ -494,16 +497,17 @@ final class LingoVMExecutor {
     /// generically to the receiver's `callMethod`, matching how `ObjCall`'s
     /// argument list always carries the receiver as its first element.
     ///
-    /// `hilite`/`delete`/`setContents*`/`setProp`'s double-index-range form
-    /// — also special-cased by the decompiler — are still deferred with an
-    /// explicit no-op rather than falling through to the generic dispatch
-    /// above: `args[0]` for these is a chunk/variable reference rather than
-    /// a receiver object, so treating it as one and calling a method
-    /// literally named e.g. `"hilite"` on it would silently do the wrong
-    /// thing on the rare occasion `args[0]` happens to itself be an object.
-    /// Properly supporting them needs a live variable reference (see the
-    /// `PushVarRef` trade-off) or (for `setProp`'s range form) a
-    /// `LingoValue` range-assignment primitive that doesn't exist yet.
+    /// `delete`/`setContents*` mutate the live reference `PushChunkVarRef`
+    /// produces (see `readVarReference`) via its `"value"` property, rather
+    /// than falling through to the generic dispatch above — `args[0]` for
+    /// these is a variable reference, not a receiver object, so treating it
+    /// as one and calling a method literally named e.g. `"setContents"` on
+    /// it would silently do the wrong thing on the rare occasion `args[0]`
+    /// happens to itself be an ordinary object.
+    ///
+    /// `hilite` is still deferred with an explicit no-op — it needs a host
+    /// hook carrying position information (which field/range to highlight)
+    /// that doesn't exist yet.
     private func dispatchObjCall(method: String, argList: LingoValue) -> LingoValue {
         let args = argList.asSequence()
         let nargs = args.count
@@ -528,8 +532,34 @@ final class LingoVMExecutor {
                 object.getProperty(propName).setElement(index: args[2], value: args[3])
                 return .void
             }
-        case ("hilite", 1), ("delete", 1), ("setProp", 5),
-            ("setContents", 2), ("setContentsAfter", 2), ("setContentsBefore", 2):
+        case ("setProp", 5):
+            if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
+                let current = object.getProperty(propName)
+                object.setProperty(
+                    propName, value: current.settingRange(start: args[2], end: args[3], value: args[4]))
+                return .void
+            }
+        case ("delete", 1):
+            // No separate chunk-range operands travel with this shape
+            // (unlike the dedicated `DeleteChunk` opcode, which pops its own
+            // char/word/item/line range selector) — a bare `nargs == 1`
+            // means `args[0]` is the whole referenced location, so this
+            // clears it entirely rather than a sub-range within it.
+            if case .object(let ref) = args[0] {
+                ref.setProperty("value", value: .string(""))
+            }
+            return .void
+        case ("setContents", 2), ("setContentsAfter", 2), ("setContentsBefore", 2):
+            if case .object(let ref) = args[0] {
+                let current = ref.getProperty("value")
+                switch method {
+                case "setContentsAfter": ref.setProperty("value", value: current.concat(args[1]))
+                case "setContentsBefore": ref.setProperty("value", value: args[1].concat(current))
+                default: ref.setProperty("value", value: args[1])
+                }
+            }
+            return .void
+        case ("hilite", 1):
             return .void
         default:
             break
@@ -775,9 +805,9 @@ final class LingoVMExecutor {
 
     /// Resolves a variable reference of the given kind (global/property,
     /// argument, local, or field) to its *current value*, popping whichever
-    /// operands that kind needs. Used by opcodes that encode the variable
-    /// dynamically via the stack rather than through their own `obj`
-    /// operand (`PushChunkVarRef`, `ObjCallV4`).
+    /// operands that kind needs. Used by `ObjCallV4`, which treats the
+    /// result as something to *call* (`dynamicallyCall`), not a write-back
+    /// target — this must keep resolving to a plain value.
     func readVar(varType: Int64) throws -> LingoValue {
         let castId: LingoValue? = (varType == 0x6 && version >= 500) ? try pop() : nil
         let id = try pop()
@@ -794,6 +824,97 @@ final class LingoVMExecutor {
         case 0x6:
             guard let object = host?.member(id, castLib: castId) else { return .void }
             return .object(object)
+        default:
+            return .void
+        }
+    }
+
+    /// A live reference to a variable/property/chunk-owning location,
+    /// exposed as a `LingoObject` so it flows through the value stack via
+    /// the existing `.object(...)` case with no change to `LingoValue`
+    /// itself. `"value"` is its only real property — read the current
+    /// value, write a new one. Meant to be short-lived: created by
+    /// `PushChunkVarRef` and consumed by the very next `ObjCall` in the
+    /// same instruction sequence, never stored long-term.
+    private final class VariableReferenceBox: LingoObject {
+        private let read: () -> LingoValue
+        private let write: (LingoValue) -> Void
+
+        init(environment: LingoEnvironment, read: @escaping () -> LingoValue, write: @escaping (LingoValue) -> Void) {
+            self.read = read
+            self.write = write
+            super.init(environment: environment)
+        }
+
+        override func getProperty(_ name: String) -> LingoValue {
+            name == "value" ? read() : super.getProperty(name)
+        }
+
+        override func setProperty(_ name: String, value: LingoValue) {
+            if name == "value" {
+                write(value)
+            } else {
+                super.setProperty(name, value: value)
+            }
+        }
+    }
+
+    /// Resolves a variable reference of the given kind to a live,
+    /// write-back-capable `VariableReferenceBox` instead of a plain value —
+    /// `readVar`'s value-only resolution can't express "write back here."
+    /// Used by `PushChunkVarRef` specifically, so a chunk/variable
+    /// reference pushed as an `ObjCall` argument (e.g. for `delete`/
+    /// `setContents*`) can still be mutated once popped from the arg list.
+    /// Mirrors `readVarTarget`'s exact pop order and per-kind logic.
+    private func readVarReference(varType: Int64) throws -> LingoValue {
+        let castId: LingoValue? = (varType == 0x6 && version >= 500) ? try pop() : nil
+        let id = try pop()
+
+        switch varType {
+        case 0x1:
+            guard case .symbol(let name) = id else { return .void }
+            return .object(
+                VariableReferenceBox(
+                    environment: environment,
+                    read: { [environment] in environment.getGlobal(name) },
+                    write: { [environment] in environment.setGlobal(name, $0) }))
+        case 0x2, 0x3:
+            guard case .symbol(let name) = id else { return .void }
+            return .object(
+                VariableReferenceBox(
+                    environment: environment,
+                    read: { [weak receiver] in receiver?.getProperty(name) ?? .void },
+                    write: { [weak receiver] in receiver?.setProperty(name, value: $0) }))
+        case 0x4:
+            guard let raw = id.asInteger() else { return .void }
+            let index = variableSlotIndex(Int64(raw))
+            return .object(
+                VariableReferenceBox(
+                    environment: environment,
+                    read: { [weak self] in self?.args[safe: index] ?? .void },
+                    write: { [weak self] value in
+                        guard let self else { return }
+                        while self.args.count <= index { self.args.append(.void) }
+                        self.args[index] = value
+                    }))
+        case 0x5:
+            guard let raw = id.asInteger() else { return .void }
+            let index = variableSlotIndex(Int64(raw))
+            return .object(
+                VariableReferenceBox(
+                    environment: environment,
+                    read: { [weak self] in self?.locals[safe: index] ?? .void },
+                    write: { [weak self] value in
+                        guard let self, self.locals.indices.contains(index) else { return }
+                        self.locals[index] = value
+                    }))
+        case 0x6:
+            guard let object = host?.member(id, castLib: castId) else { return .void }
+            return .object(
+                VariableReferenceBox(
+                    environment: environment,
+                    read: { object.getProperty("text") },
+                    write: { object.setProperty("text", value: $0) }))
         default:
             return .void
         }

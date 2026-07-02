@@ -232,17 +232,33 @@ public final class LingoTranspiler {
         return output
     }
 
+    /// Unwraps a possibly chunk-nested assignment target (e.g. `word 1 of
+    /// line 2 of x`) down to the identifier it ultimately writes back into,
+    /// so `collectVariables` can mark that identifier mutated the same way
+    /// it would for a plain `x = ...`.
+    private func rootIdentifier(of target: LingoAST.Expression) -> String? {
+        switch target {
+        case .identifier(let name): return name
+        case .chunkExpression(_, _, _, let string, _): return rootIdentifier(of: string)
+        default: return nil
+        }
+    }
+
     private func collectVariables(in statements: [Statement], locals: inout Set<String>, globals: inout Set<String>) {
         for stmt in statements {
             switch stmt {
             case .global(let names):
                 for name in names { globals.insert(name.lowercased()) }
             case .assignment(let target, _, _):
-                if case .identifier(let name) = target {
+                if let name = rootIdentifier(of: target) {
                     locals.insert(name.lowercased())
                 }
             case .put(_, _, let target):
-                if let target = target, case .identifier(let name) = target {
+                if let target = target, let name = rootIdentifier(of: target) {
+                    locals.insert(name.lowercased())
+                }
+            case .chunkDelete(let chunk):
+                if let name = rootIdentifier(of: chunk) {
                     locals.insert(name.lowercased())
                 }
             case .repeatWithCounter(let variable, _, _, let body, _):
@@ -437,8 +453,12 @@ public final class LingoTranspiler {
             let chunkStr = await transpile(expression: chunk, locals: locals, isMethod: isMethod)
             output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"hilite\", args: [\(chunkStr)])\n"
         case .chunkDelete(let chunk):
-            let chunkStr = await transpile(expression: chunk, locals: locals, isMethod: isMethod)
-            output += "\(indent)_ = \(environmentRef(isMethod: isMethod)).callGlobal(\"delete\", args: [\(chunkStr)])\n"
+            // `delete <chunk>` is semantically `put "" into <chunk>` — route
+            // through the same assignment machinery `put` already uses so
+            // the chunk's underlying variable/property actually gets
+            // written back, rather than discarding the result via
+            // `callGlobal`, which had no way to write anything.
+            output += await transpileAssignment(target: chunk, valStr: "LingoValue.string(\"\")", indent: indent, locals: locals, isMethod: isMethod)
         }
         return output
     }

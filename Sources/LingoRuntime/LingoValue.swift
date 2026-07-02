@@ -156,6 +156,28 @@ public enum LingoValue {
         return .string(String(s[startStrIdx..<endStrIdx]))
     }
 
+    /// 1-based string chunking (e.g. `char 1 to 5`), replacing that range
+    /// with `value` and returning the resulting string. Mirrors
+    /// `getRange(start:end:)`'s indexing exactly, so a `getRange`/
+    /// `settingRange` round-trip at the same bounds is a no-op.
+    public func settingRange(start: LingoValue, end: LingoValue, value: LingoValue) -> LingoValue {
+        guard case .string(let s) = self,
+            case .integer(let sIdx) = start,
+            case .integer(let eIdx) = end
+        else { return self }
+
+        let replacement = value.asString()
+        let safeStart = Swift.max(1, sIdx)
+        if safeStart > s.count { return .string(s + replacement) }
+
+        let safeEnd = Swift.min(s.count, eIdx)
+        let startStrIdx = s.index(s.startIndex, offsetBy: safeStart - 1)
+        let endStrIdx = safeStart > safeEnd ? startStrIdx : s.index(s.startIndex, offsetBy: safeEnd)
+        var result = s
+        result.replaceSubrange(startStrIdx..<endStrIdx, with: replacement)
+        return .string(result)
+    }
+
     /// 0-based range extraction for Swift convenience.
     public func getRange(start: Int, end: Int) -> LingoValue {
         guard case .string(let s) = self else { return .void }
