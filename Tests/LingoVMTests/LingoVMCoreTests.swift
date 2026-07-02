@@ -17,9 +17,10 @@ import LingoRuntime
 }
 
 @Test func unrecognizedOpcodeThrows() throws {
-    // NewObj's opcode (0x73) is recognized by the parser but not yet handled
-    // by the executor's step loop at this point in the build-out (Step 10).
-    let bytecode = try [UInt8]([0x73, 0x00]).withParserSpan { span in
+    // Every real opcode is handled as of Step 10's full sweep — `.invalid`
+    // (0x00) is the one value that should permanently throw, since it's
+    // explicitly a placeholder/never-emitted marker, not a real instruction.
+    let bytecode = try [UInt8]([0x00]).withParserSpan { span in
         try Bytecode(parsing: &span)
     }
     let handler = HandlerDef(
@@ -27,7 +28,7 @@ import LingoRuntime
     let chunk = ScriptChunk(
         scriptNumber: 1, literals: [], handlers: [handler], propertyNameIDs: [], propertyDefaults: [:])
 
-    #expect(throws: LingoVMError.unknownOpcode(.newObj)) {
+    #expect(throws: LingoVMError.unknownOpcode(.invalid)) {
         try LingoVM.call(handler: handler, chunk: chunk, names: [], version: 500)
     }
 }

@@ -70,3 +70,29 @@ final class TestReceiver: LingoObject {
         return .string("called:\(name)")
     }
 }
+
+/// A minimal `LingoVMHost` resolving sprites/members by integer id and
+/// exposing a `TestReceiver` as the movie, for testing property dispatch
+/// that needs a host without any real Director runtime behind it.
+final class TestHost: LingoVMHost {
+    let movieObject = TestReceiver()
+    var sprites: [Int: LingoObject] = [:]
+    var members: [Int: LingoObject] = [:]
+    var intersects = false
+    var within = false
+
+    var movie: LingoObject { movieObject }
+
+    func sprite(_ channel: LingoValue) -> LingoObject? {
+        guard let index = channel.asInteger() else { return nil }
+        return sprites[index]
+    }
+
+    func member(_ id: LingoValue, castLib: LingoValue?) -> LingoObject? {
+        guard let index = id.asInteger() else { return nil }
+        return members[index]
+    }
+
+    func spriteIntersects(_ a: LingoObject, _ b: LingoObject) -> Bool { intersects }
+    func spriteWithin(_ a: LingoObject, _ b: LingoObject) -> Bool { within }
+}
