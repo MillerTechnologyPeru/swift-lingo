@@ -443,13 +443,12 @@ final class LingoVMExecutor {
             }
 
         case .hiliteChunk:
-            // A UI side effect (highlighting text in a live field member)
-            // with no meaningful return value and no host hook yet — the
-            // operands still have to be consumed for stack balance.
             let castId: LingoValue? = version >= 500 ? try pop() : nil
-            _ = castId
-            _ = try pop()  // fieldId
-            _ = try popChunkRangeSelector()
+            let fieldId = try pop()
+            let range = try popChunkRangeSelector()
+            if let range, let member = host?.member(fieldId, castLib: castId) {
+                host?.hilite(member, type: range.type, first: range.first, last: range.last)
+            }
 
         case .ontoSpr:
             let second = try pop()
