@@ -79,6 +79,7 @@ final class TestHost: LingoVMHost {
     let movieObject: TestReceiver
     var sprites: [Int: LingoObject] = [:]
     var members: [Int: LingoObject] = [:]
+    var windows: [Int: LingoObject] = [:]
     var intersects = false
     var within = false
 
@@ -91,6 +92,11 @@ final class TestHost: LingoVMHost {
     func sprite(_ channel: LingoValue) -> LingoObject? {
         guard let index = channel.asInteger() else { return nil }
         return sprites[index]
+    }
+
+    func window(_ id: LingoValue) -> LingoObject? {
+        guard let index = id.asInteger() else { return nil }
+        return windows[index]
     }
 
     func member(_ id: LingoValue, castLib: LingoValue?) -> LingoObject? {
