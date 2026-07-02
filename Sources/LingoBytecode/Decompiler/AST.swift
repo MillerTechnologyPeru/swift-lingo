@@ -1,7 +1,14 @@
+import LingoAST
+
 /// The bytecode decompiler's internal intermediate tree, built up during
 /// stack-machine simulation before being converted into
 /// `LingoAST.Statement`/`Expression` — the only type this module exposes
 /// publicly. It never escapes `LingoBytecode`.
+///
+/// `put`'s statement reuses `LingoAST.PutType` directly (`.into`/`.after`/
+/// `.before`) rather than declaring an equivalent decompiler-local copy,
+/// since the shapes are identical and this tree's only consumer is the
+/// conversion into `LingoAST` itself.
 ///
 /// Most node kinds are built once and never mutated afterward, so `AstNode`
 /// is a plain `indirect enum` (a value type). The two variants whose fields
