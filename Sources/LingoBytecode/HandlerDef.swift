@@ -36,8 +36,7 @@ public struct HandlerDef: Equatable, Sendable {
                     rebasing: rawBuffer[offsetInBuffer..<rawBuffer.count]))
 
             var bytecodeArray: [Bytecode] = []
-            bytecodeArray.reserveCapacity(record.compiledLen)
-            for _ in 0..<record.compiledLen {
+            while bytecodeSpan.startPosition < record.compiledLen {
                 let bc = try Bytecode(parsing: &bytecodeSpan)
                 bytecodeArray.append(bc)
             }
@@ -64,7 +63,7 @@ public struct HandlerDef: Equatable, Sendable {
         count: Int,
         offset: Int
     ) throws(any Error) -> [UInt16] {
-        guard count == 0 else { return [] }
+        guard count > 0 else { return [] }
         return try chunkSpan.withUnsafeBytes { rawBuffer in
             let offsetInBuffer = offset - chunkSpan.startPosition
             guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
