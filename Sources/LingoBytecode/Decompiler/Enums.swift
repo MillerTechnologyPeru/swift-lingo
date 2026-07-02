@@ -31,23 +31,24 @@ enum ChunkExprType: UInt8, Equatable {
     }
 }
 
-enum PutType: UInt8, Equatable {
-    case into = 0x01
-    case after = 0x02
-    case before = 0x03
-
-    var name: String {
-        switch self {
-        case .into: return "into"
-        case .after: return "after"
-        case .before: return "before"
-        }
-    }
-}
-
 enum CaseExpect: Equatable {
     case end
     case or
     case next
     case otherwise
+}
+
+/// Tags applied to specific bytecode indices during loop identification, so
+/// the main decode pass can skip a loop's internal setup/teardown
+/// instructions and recognize jumps back to them as `exit repeat`/`next
+/// repeat` rather than a generic, unrecognized jump.
+enum BytecodeTag: Equatable {
+    case none
+    case skip
+    case repeatWhile
+    case repeatWithIn
+    case repeatWithTo
+    case repeatWithDownTo
+    case nextRepeatTarget
+    case endCase
 }
