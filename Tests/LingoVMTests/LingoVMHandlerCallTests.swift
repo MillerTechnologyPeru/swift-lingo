@@ -165,6 +165,30 @@ import LingoRuntime
     #expect(LingoValue.equalsBool(lhs: elements[1], rhs: .integer(20)))
 }
 
+@Test func objCallSetPropWithRangeReplacesASpanOfAStringProperty() throws {
+    let environment = LingoEnvironment()
+    let receiver = TestReceiver(environment: environment)
+    receiver.properties["name"] = .string("hello world")
+    environment.setGlobal("vmTestSetPropRangeReceiver", .object(receiver))
+
+    let executor = try makeExecutor(
+        bytes: [
+            0x49, 0x00,  // GetGlobal vmTestSetPropRangeReceiver
+            0x45, 0x01,  // PushSymb name
+            0x41, 0x01,  // PushInt8 1
+            0x41, 0x05,  // PushInt8 5
+            0x44, 0x00,  // PushCons 0 ("HELLO")
+            0x43, 0x05,  // PushArgList 5 (receiver, #name, 1, 5, "HELLO")
+            0x67, 0x02,  // ObjCall setProp
+            0x01  // Ret
+        ],
+        names: ["vmTestSetPropRangeReceiver", "name", "setProp"], literals: [.string("HELLO")],
+        environment: environment)
+    _ = try executor.run()
+
+    #expect(LingoValue.equalsBool(lhs: receiver.properties["name"] ?? .void, rhs: .string("HELLO world")))
+}
+
 @Test func objCallDeferredMethodsAreNoOpsAndDoNotMisdispatch() throws {
     // `hilite`/`delete`/`setContents*` take a chunk/variable reference as
     // their first argument, not a receiver — even when that argument
