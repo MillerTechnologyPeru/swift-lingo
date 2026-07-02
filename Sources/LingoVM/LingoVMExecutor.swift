@@ -24,6 +24,14 @@ final class LingoVMExecutor {
     var returnValue: LingoValue = .void
     let bytecodePosMap: [Int: Int]
 
+    /// The `tell`-block target currently in effect, if any — pushed by
+    /// `StartTell` (resolved through `host.window(_:)`) and popped by
+    /// `EndTell`, so nested `tell` blocks stay correctly balanced even when
+    /// an inner block's window fails to resolve (`nil` is still pushed, not
+    /// skipped, to keep every `EndTell` popping exactly what its matching
+    /// `StartTell` pushed).
+    var tellStack: [LingoObject?] = []
+
     init(
         handler: HandlerDef,
         chunk: ScriptChunk,
@@ -288,14 +296,25 @@ final class LingoVMExecutor {
                 multiplier: multiplier, depth: depth + 1)
             push(result)
 
-        case .extCall, .tellCall:
-            // `tellCall` targets a different window's message queue in the
-            // reference implementation; the decompiler doesn't distinguish
-            // it from `extCall` either, so this collapses to the same
-            // named-global dispatch.
+        case .extCall:
             let name = getName(obj)
             let argList = try pop()
             push(environment.callGlobal(name, args: argList.asSequence()))
+
+        case .tellCall:
+            // Inside a `tell` block, a message send redirects to the
+            // block's target window instead of the movie's normal global
+            // dispatch — matching `tellStack`'s innermost active target, if
+            // its window resolved to an object. Outside any `tell` block
+            // (or when the window didn't resolve), this degrades to the
+            // same named-global dispatch as `ExtCall`.
+            let name = getName(obj)
+            let argList = try pop()
+            if let target = tellStack.last, let target {
+                push(target.callMethod(name, args: argList.asSequence()))
+            } else {
+                push(environment.callGlobal(name, args: argList.asSequence()))
+            }
 
         case .objCallV4:
             let argList = try pop()
@@ -451,15 +470,11 @@ final class LingoVMExecutor {
             }
 
         case .startTell:
-            // A real `tell` redirects subsequent message sends (ExtCall/
-            // ObjCall) to a different window for the duration of the block.
-            // `LingoVMHost` has no hook for that yet, so this only consumes
-            // the operand for stack balance — `tellCall` already collapses
-            // to a plain global dispatch for the same reason (see there).
-            _ = try pop()  // window
+            let window = try pop()
+            tellStack.append(host?.window(window))
 
         case .endTell:
-            break  // no state to unwind without a tell-target stack
+            _ = tellStack.popLast()
 
         case .callJavaScript:
             // Unimplemented in the reference too (warning-only stub) — no
