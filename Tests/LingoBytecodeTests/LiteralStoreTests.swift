@@ -36,6 +36,18 @@ import BinaryParsing
     #expect(store.data == .int(300))
 }
 
+@Test func intLiteralReadDataDecodesDirectly() throws {
+    let recordBytes: [UInt8] = [
+        0x00, 0x00, 0x00, 0x04,  // type = Int
+        0xFF, 0xFF, 0xFF, 0xFF  // offset = -1 as raw UInt32 bits
+    ]
+    let value = try recordBytes.withParserSpan { recordSpan -> LiteralValue in
+        let record = try LiteralStoreRecord(parsing: &recordSpan)
+        return try LiteralStore.readData(from: recordSpan, record: record)
+    }
+    #expect(value == .int(-1))
+}
+
 @Test func floatLiteralDecodes() throws {
     let recordBytes: [UInt8] = [
         0x00, 0x00, 0x00, 0x09,  // type = Float
