@@ -95,6 +95,7 @@ struct CompilationTests {
 
             let package = Package(
                 name: "LingoCompileTest",
+                platforms: [.macOS(.v14)],
                 dependencies: [
                     \(dependency)
                 ],
