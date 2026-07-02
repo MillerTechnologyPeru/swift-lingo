@@ -5,24 +5,6 @@ import LingoRuntime
 
 @testable import LingoVM
 
-private func makeExecutor(bytes: [UInt8], literals: [LiteralValue] = []) throws -> LingoVMExecutor {
-    let bytecodeArray = try bytes.withParserSpan { span -> [Bytecode] in
-        var array: [Bytecode] = []
-        while !span.isEmpty {
-            array.append(try Bytecode(parsing: &span))
-        }
-        return array
-    }
-    let handler = HandlerDef(
-        nameId: 0, bytecodeArray: bytecodeArray, argumentNameIds: [], localNameIds: [], globalNameIds: [])
-    let chunk = ScriptChunk(
-        scriptNumber: 1, literals: literals, handlers: [handler], propertyNameIDs: [],
-        propertyDefaults: [:])
-    return LingoVMExecutor(
-        handler: handler, chunk: chunk, names: ["x"], args: [], receiver: nil, host: nil, version: 500,
-        multiplier: 8, depth: 0)
-}
-
 @Test func arithmeticFollowsOperatorPrecedenceAsCompiled() throws {
     // 1 + (2 * 3), compiled with the multiply already evaluated: push 1, push 2, push 3, mul, add
     let executor = try makeExecutor(bytes: [0x41, 0x01, 0x41, 0x02, 0x41, 0x03, 0x04, 0x05])
