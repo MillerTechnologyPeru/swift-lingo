@@ -856,15 +856,15 @@ final class DecompilerState {
         let expect: CaseExpect
         if notEq {
             expect = .or
-        } else if targetIndex < handler.bytecodeArray.count, handler.bytecodeArray[targetIndex].opcode == .peek
-        {
+        } else if targetIndex < handler.bytecodeArray.count, handler.bytecodeArray[targetIndex].opcode == .peek {
             expect = .next
         } else if targetIndex < handler.bytecodeArray.count,
             handler.bytecodeArray[targetIndex].opcode == .pop,
             handler.bytecodeArray[targetIndex].obj == 1,
             targetIndex == 0
                 || handler.bytecodeArray[targetIndex - 1].opcode != .jmp
-                || (Int64(handler.bytecodeArray[targetIndex - 1].pos) + handler.bytecodeArray[targetIndex - 1]
+                || (Int64(handler.bytecodeArray[targetIndex - 1].pos)
+                    + handler.bytecodeArray[targetIndex - 1]
                     .obj) == Int64(handler.bytecodeArray[targetIndex].pos)
         {
             expect = .end
@@ -918,7 +918,8 @@ final class DecompilerState {
                 return .chunkHilite(args[0])
             case "delete" where nargs == 1:
                 return .chunkDelete(args[0])
-            case "getProp", "getPropRef" where nargs == 3 || nargs == 4:
+            case "getProp",
+                "getPropRef" where nargs == 3 || nargs == 4:
                 if let datum = args[1].value, datum.datumType == .symbol {
                     let i2: AstNode? = nargs == 4 ? args[3] : nil
                     return .objPropIndex(
@@ -936,7 +937,8 @@ final class DecompilerState {
                     let propExpr: AstNode = .objProp(obj: args[0], prop: datum.stringValue)
                     return .objProp(obj: propExpr, prop: "count")
                 }
-            case "setContents", "setContentsAfter", "setContentsBefore" where nargs == 2:
+            case "setContents", "setContentsAfter",
+                "setContentsBefore" where nargs == 2:
                 let putType: PutType = method == "setContents" ? .into : (method == "setContentsAfter" ? .after : .before)
                 return .put(putType: putType, variable: args[0], value: args[1])
             default:
@@ -1026,21 +1028,21 @@ final class DecompilerState {
             return .stringChunkCount(chunkType: Self.v4ChunkType(propertyID), obj: string)
 
         case 0x02:
-            return .menuProp(menuId: pop(), prop: UInt32(bitPattern: propertyID))
+            return .menuProp(menuID: pop(), prop: UInt32(bitPattern: propertyID))
 
         case 0x03:
             let menuId = pop()
             let itemId = pop()
-            return .menuItemProp(menuId: menuId, itemId: itemId, prop: UInt32(bitPattern: propertyID))
+            return .menuItemProp(menuID: menuId, itemID: itemId, prop: UInt32(bitPattern: propertyID))
 
         case 0x04:
-            return .soundProp(soundId: pop(), prop: UInt32(bitPattern: propertyID))
+            return .soundProp(soundID: pop(), prop: UInt32(bitPattern: propertyID))
 
         case 0x05:
             return .comment("ERROR: Resource property")
 
         case 0x06:
-            return .spriteProp(spriteId: pop(), prop: UInt32(bitPattern: propertyID))
+            return .spriteProp(spriteID: pop(), prop: UInt32(bitPattern: propertyID))
 
         case 0x07:
             return .the(animationPropertyName(propertyID))
