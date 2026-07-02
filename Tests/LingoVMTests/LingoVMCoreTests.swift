@@ -11,7 +11,8 @@ import LingoRuntime
     let chunk = ScriptChunk(
         scriptNumber: 1, literals: [], handlers: [handler], propertyNameIDs: [], propertyDefaults: [:])
 
-    let result = try LingoVM.call(handler: handler, chunk: chunk, names: [], version: 500)
+    let result = try LingoVM.call(
+        handler: handler, chunk: chunk, names: [], environment: LingoEnvironment(), version: 500)
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .void))
 }
@@ -29,6 +30,7 @@ import LingoRuntime
         scriptNumber: 1, literals: [], handlers: [handler], propertyNameIDs: [], propertyDefaults: [:])
 
     #expect(throws: LingoVMError.unknownOpcode(.invalid)) {
-        try LingoVM.call(handler: handler, chunk: chunk, names: [], version: 500)
+        try LingoVM.call(
+            handler: handler, chunk: chunk, names: [], environment: LingoEnvironment(), version: 500)
     }
 }

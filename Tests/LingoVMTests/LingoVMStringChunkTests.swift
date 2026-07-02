@@ -59,7 +59,8 @@ import LingoRuntime
 }
 
 @Test func putChunkReplacesAWordInPlace() throws {
-    LingoEnvironment.shared.setGlobal("vmTestPutChunkGlobal", .string("one two three"))
+    let environment = LingoEnvironment()
+    environment.setGlobal("vmTestPutChunkGlobal", .string("one two three"))
 
     let executor = try makeExecutor(
         bytes: [
@@ -73,14 +74,15 @@ import LingoRuntime
             0x49, 0x00,  // GetGlobal vmTestPutChunkGlobal
             0x01  // Ret
         ],
-        names: ["vmTestPutChunkGlobal"], literals: [.string("TWO")])
+        names: ["vmTestPutChunkGlobal"], literals: [.string("TWO")], environment: environment)
     let result = try executor.run()
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .string("one TWO three")))
 }
 
 @Test func deleteChunkClearsTheSpecifiedWord() throws {
-    LingoEnvironment.shared.setGlobal("vmTestDeleteChunkGlobal", .string("one two three"))
+    let environment = LingoEnvironment()
+    environment.setGlobal("vmTestDeleteChunkGlobal", .string("one two three"))
 
     let executor = try makeExecutor(
         bytes: [
@@ -93,7 +95,7 @@ import LingoRuntime
             0x49, 0x00,  // GetGlobal vmTestDeleteChunkGlobal
             0x01  // Ret
         ],
-        names: ["vmTestDeleteChunkGlobal"])
+        names: ["vmTestDeleteChunkGlobal"], environment: environment)
     let result = try executor.run()
 
     // settingChunk replaces the word with "", leaving the space separators
@@ -103,11 +105,12 @@ import LingoRuntime
 }
 
 @Test func spriteCollisionOpcodesDelegateToHost() throws {
+    let environment = LingoEnvironment()
     let host = TestHost()
-    let spriteA = TestReceiver()
-    let spriteB = TestReceiver()
-    LingoEnvironment.shared.setGlobal("vmTestSpriteA", .object(spriteA))
-    LingoEnvironment.shared.setGlobal("vmTestSpriteB", .object(spriteB))
+    let spriteA = TestReceiver(environment: environment)
+    let spriteB = TestReceiver(environment: environment)
+    environment.setGlobal("vmTestSpriteA", .object(spriteA))
+    environment.setGlobal("vmTestSpriteB", .object(spriteB))
 
     func runOntoSpr() throws -> LingoValue {
         try makeExecutor(
@@ -117,7 +120,7 @@ import LingoRuntime
                 0x19,  // OntoSpr
                 0x01  // Ret
             ],
-            names: ["vmTestSpriteA", "vmTestSpriteB"], host: host
+            names: ["vmTestSpriteA", "vmTestSpriteB"], host: host, environment: environment
         ).run()
     }
 

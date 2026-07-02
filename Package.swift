@@ -89,7 +89,7 @@ let package = Package(
         ),
         .testTarget(
             name: "LingoBytecodeTests",
-            dependencies: ["LingoBytecode"],
+            dependencies: ["LingoBytecode", "LingoParser"],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         // Embedded Runtime (Library)

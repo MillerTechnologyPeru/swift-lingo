@@ -13,6 +13,7 @@ final class LingoVMExecutor {
     let receiver: LingoObject?
     var args: [LingoValue]
     let host: LingoVMHost?
+    let environment: LingoEnvironment
     let version: UInt16
     let multiplier: UInt32
     let depth: Int
@@ -23,6 +24,14 @@ final class LingoVMExecutor {
     var returnValue: LingoValue = .void
     let bytecodePosMap: [Int: Int]
 
+    /// The `tell`-block target currently in effect, if any — pushed by
+    /// `StartTell` (resolved through `host.window(_:)`) and popped by
+    /// `EndTell`, so nested `tell` blocks stay correctly balanced even when
+    /// an inner block's window fails to resolve (`nil` is still pushed, not
+    /// skipped, to keep every `EndTell` popping exactly what its matching
+    /// `StartTell` pushed).
+    var tellStack: [LingoObject?] = []
+
     init(
         handler: HandlerDef,
         chunk: ScriptChunk,
@@ -30,6 +39,7 @@ final class LingoVMExecutor {
         args: [LingoValue],
         receiver: LingoObject?,
         host: LingoVMHost?,
+        environment: LingoEnvironment,
         version: UInt16,
         multiplier: UInt32,
         depth: Int
@@ -40,6 +50,7 @@ final class LingoVMExecutor {
         self.args = args
         self.receiver = receiver
         self.host = host
+        self.environment = environment
         self.version = version
         self.multiplier = multiplier
         self.depth = depth
@@ -198,10 +209,10 @@ final class LingoVMExecutor {
             push(a != b)
 
         case .getGlobal, .getGlobal2:
-            push(LingoEnvironment.shared.getGlobal(getName(obj)))
+            push(environment.getGlobal(getName(obj)))
 
         case .setGlobal, .setGlobal2:
-            LingoEnvironment.shared.setGlobal(getName(obj), try pop())
+            environment.setGlobal(getName(obj), try pop())
 
         case .getProp:
             push(receiver?.getProperty(getName(obj)) ?? .void)
@@ -232,7 +243,7 @@ final class LingoVMExecutor {
         case .getTopLevelProp:
             // Not distinguished from a plain global lookup — the decompiler
             // doesn't distinguish it from `Var` either.
-            push(LingoEnvironment.shared.getGlobal(getName(obj)))
+            push(environment.getGlobal(getName(obj)))
 
         case .pushVarRef:
             // Pushes the variable's *name*, not its value — matching the
@@ -281,18 +292,29 @@ final class LingoVMExecutor {
             }
             let result = try LingoVM.call(
                 handler: targetHandler, chunk: chunk, names: names, args: argList.asSequence(),
-                receiver: receiver, host: host, version: version, multiplier: multiplier,
-                depth: depth + 1)
+                receiver: receiver, host: host, environment: environment, version: version,
+                multiplier: multiplier, depth: depth + 1)
             push(result)
 
-        case .extCall, .tellCall:
-            // `tellCall` targets a different window's message queue in the
-            // reference implementation; the decompiler doesn't distinguish
-            // it from `extCall` either, so this collapses to the same
-            // named-global dispatch.
+        case .extCall:
             let name = getName(obj)
             let argList = try pop()
-            push(LingoEnvironment.shared.callGlobal(name, args: argList.asSequence()))
+            push(environment.callGlobal(name, args: argList.asSequence()))
+
+        case .tellCall:
+            // Inside a `tell` block, a message send redirects to the
+            // block's target window instead of the movie's normal global
+            // dispatch — matching `tellStack`'s innermost active target, if
+            // its window resolved to an object. Outside any `tell` block
+            // (or when the window didn't resolve), this degrades to the
+            // same named-global dispatch as `ExtCall`.
+            let name = getName(obj)
+            let argList = try pop()
+            if let target = tellStack.last, let target {
+                push(target.callMethod(name, args: argList.asSequence()))
+            } else {
+                push(environment.callGlobal(name, args: argList.asSequence()))
+            }
 
         case .objCallV4:
             let argList = try pop()
@@ -448,15 +470,11 @@ final class LingoVMExecutor {
             }
 
         case .startTell:
-            // A real `tell` redirects subsequent message sends (ExtCall/
-            // ObjCall) to a different window for the duration of the block.
-            // `LingoVMHost` has no hook for that yet, so this only consumes
-            // the operand for stack balance — `tellCall` already collapses
-            // to a plain global dispatch for the same reason (see there).
-            _ = try pop()  // window
+            let window = try pop()
+            tellStack.append(host?.window(window))
 
         case .endTell:
-            break  // no state to unwind without a tell-target stack
+            _ = tellStack.popLast()
 
         case .callJavaScript:
             // Unimplemented in the reference too (warning-only stub) — no
@@ -470,16 +488,22 @@ final class LingoVMExecutor {
         return .advance
     }
 
-    /// Recognizes the handful of built-in list methods with dedicated
-    /// `LingoValue` primitives (mirroring the same special-casing the
-    /// decompiler applies for readability); anything else dispatches
+    /// Recognizes the handful of built-in list/property methods with
+    /// dedicated `LingoValue` primitives (mirroring the same special-casing
+    /// the decompiler applies for readability); anything else dispatches
     /// generically to the receiver's `callMethod`, matching how `ObjCall`'s
     /// argument list always carries the receiver as its first element.
     ///
-    /// `getProp`/`getPropRef`/`setProp`/`setContents*` — also special-cased
-    /// by the decompiler — are still deferred: they need either list
-    /// double-index ranges or a live variable reference (see the
-    /// `PushVarRef` trade-off).
+    /// `hilite`/`delete`/`setContents*`/`setProp`'s double-index-range form
+    /// — also special-cased by the decompiler — are still deferred with an
+    /// explicit no-op rather than falling through to the generic dispatch
+    /// above: `args[0]` for these is a chunk/variable reference rather than
+    /// a receiver object, so treating it as one and calling a method
+    /// literally named e.g. `"hilite"` on it would silently do the wrong
+    /// thing on the rare occasion `args[0]` happens to itself be an object.
+    /// Properly supporting them needs a live variable reference (see the
+    /// `PushVarRef` trade-off) or (for `setProp`'s range form) a
+    /// `LingoValue` range-assignment primitive that doesn't exist yet.
     private func dispatchObjCall(method: String, argList: LingoValue) -> LingoValue {
         let args = argList.asSequence()
         let nargs = args.count
@@ -494,6 +518,19 @@ final class LingoVMExecutor {
             if case .symbol(let propName) = args[1], case .object(let object) = args[0] {
                 return object.getProperty(propName).count
             }
+        case ("getProp", 3), ("getProp", 4), ("getPropRef", 3), ("getPropRef", 4):
+            if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
+                let value = object.getProperty(propName)
+                return nargs == 4 ? value.getRange(start: args[2], end: args[3]) : value[args[2]]
+            }
+        case ("setProp", 4):
+            if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
+                object.getProperty(propName).setElement(index: args[2], value: args[3])
+                return .void
+            }
+        case ("hilite", 1), ("delete", 1), ("setProp", 5),
+            ("setContents", 2), ("setContentsAfter", 2), ("setContentsBefore", 2):
+            return .void
         default:
             break
         }
@@ -807,7 +844,7 @@ final class LingoVMExecutor {
 
     private func readVariable(_ target: VariableTarget) -> LingoValue {
         switch target {
-        case .global(let name): return LingoEnvironment.shared.getGlobal(name)
+        case .global(let name): return environment.getGlobal(name)
         case .property(let name): return receiver?.getProperty(name) ?? .void
         case .argument(let index): return args[safe: index] ?? .void
         case .local(let index): return locals[safe: index] ?? .void
@@ -818,7 +855,7 @@ final class LingoVMExecutor {
     private func writeVariable(_ target: VariableTarget, value: LingoValue) {
         switch target {
         case .global(let name):
-            LingoEnvironment.shared.setGlobal(name, value)
+            environment.setGlobal(name, value)
         case .property(let name):
             receiver?.setProperty(name, value: value)
         case .argument(let index):

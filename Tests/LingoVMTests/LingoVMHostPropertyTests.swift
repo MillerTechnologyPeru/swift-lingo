@@ -4,8 +4,9 @@ import LingoRuntime
 @testable import LingoVM
 
 @Test func objPropGetSetDispatchesToAnArbitraryObject() throws {
-    let receiver = TestReceiver()
-    LingoEnvironment.shared.setGlobal("vmTestObjPropTarget", .object(receiver))
+    let environment = LingoEnvironment()
+    let receiver = TestReceiver(environment: environment)
+    environment.setGlobal("vmTestObjPropTarget", .object(receiver))
 
     let executor = try makeExecutor(
         bytes: [
@@ -16,7 +17,7 @@ import LingoRuntime
             0x61, 0x01,  // GetObjProp y
             0x01  // Ret
         ],
-        names: ["vmTestObjPropTarget", "y"])
+        names: ["vmTestObjPropTarget", "y"], environment: environment)
     let result = try executor.run()
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(7)))
@@ -59,7 +60,7 @@ import LingoRuntime
 
 @Test func v4GetSetResolvesSpritePropertyThroughHost() throws {
     let host = TestHost()
-    let sprite = TestReceiver()
+    let sprite = TestReceiver(environment: LingoEnvironment())
     host.sprites[3] = sprite
 
     // "set the locH of sprite 3 to 99" then read it back.
@@ -98,7 +99,7 @@ import LingoRuntime
 
 @Test func v4GetResolvesMemberPropertyThroughHost() throws {
     let host = TestHost()
-    let member = TestReceiver()
+    let member = TestReceiver(environment: LingoEnvironment())
     host.members[1] = member
     member.properties["name"] = .string("myMember")
 

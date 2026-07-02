@@ -73,19 +73,19 @@ struct TranspilerTests {
         #expect(await transpileExpr("FALSE") == "LingoValue.integer(0)")
 
         // Identifiers and Variables
-        // Assuming no locals, identifiers default to LingoEnvironment.shared.getGlobal unless specialcased
-        #expect(await transpileExpr("myVar") == "LingoEnvironment.shared.getGlobal(\"myVar\")")
+        // Assuming no locals, identifiers default to environment.getGlobal unless specialcased
+        #expect(await transpileExpr("myVar") == "environment.getGlobal(\"myVar\")")
         #expect(await transpileExpr("myVar", locals: ["myvar"]) == "`myvar`")
 
-        #expect(await transpileExpr("the mouseH") == "LingoEnvironment.shared.getGlobal(\"mouseH\")")
+        #expect(await transpileExpr("the mouseH") == "environment.getGlobal(\"mouseH\")")
 
-        #expect(await transpileExpr("the width of sprite 1") == "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoValue.integer(1)]).`width`")
-        #expect(await transpileExpr("sprite(1).width") == "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoValue.integer(1)]).`width`")
+        #expect(await transpileExpr("the width of sprite 1") == "environment.callGlobal(\"sprite\", args: [LingoValue.integer(1)]).`width`")
+        #expect(await transpileExpr("sprite(1).width") == "environment.callGlobal(\"sprite\", args: [LingoValue.integer(1)]).`width`")
 
-        #expect(await transpileExpr("obj.prop") == "LingoEnvironment.shared.getGlobal(\"obj\").`prop`")
-        #expect(await transpileExpr("the prop of obj") == "LingoEnvironment.shared.getGlobal(\"obj\").`prop`")
+        #expect(await transpileExpr("obj.prop") == "environment.getGlobal(\"obj\").`prop`")
+        #expect(await transpileExpr("the prop of obj") == "environment.getGlobal(\"obj\").`prop`")
 
-        #expect(await transpileExpr("myList[1]") == "LingoEnvironment.shared.getGlobal(\"myList\")[LingoValue.integer(1)]")
+        #expect(await transpileExpr("myList[1]") == "environment.getGlobal(\"myList\")[LingoValue.integer(1)]")
         #expect(await transpileExpr("myList[1]", locals: ["mylist"]) == "`mylist`[LingoValue.integer(1)]")
 
         // Collections
@@ -95,10 +95,10 @@ struct TranspilerTests {
         #expect(await transpileExpr("[#a: 1]") == "LingoValue.propertyList([(key: LingoValue.symbol(\"a\"), value: LingoValue.integer(1))])")
 
         // Calls
-        #expect(await transpileExpr("foo()") == "LingoEnvironment.shared.callGlobal(\"foo\", args: [])")
-        #expect(await transpileExpr("foo(1, 2)") == "LingoEnvironment.shared.callGlobal(\"foo\", args: [LingoValue.integer(1), LingoValue.integer(2)])")
-        #expect(await transpileExpr("obj.foo()") == "LingoEnvironment.shared.getGlobal(\"obj\").`foo`()")
-        #expect(await transpileExpr("call(#foo, obj)") == "LingoEnvironment.shared.callGlobal(\"call\", args: [LingoValue.symbol(\"foo\"), LingoEnvironment.shared.getGlobal(\"obj\")])")
+        #expect(await transpileExpr("foo()") == "environment.callGlobal(\"foo\", args: [])")
+        #expect(await transpileExpr("foo(1, 2)") == "environment.callGlobal(\"foo\", args: [LingoValue.integer(1), LingoValue.integer(2)])")
+        #expect(await transpileExpr("obj.foo()") == "environment.getGlobal(\"obj\").`foo`()")
+        #expect(await transpileExpr("call(#foo, obj)") == "environment.callGlobal(\"call\", args: [LingoValue.symbol(\"foo\"), environment.getGlobal(\"obj\")])")
 
         // Operations
         #expect(await transpileExpr("1 + 2") == "(LingoValue.integer(1) + LingoValue.integer(2))")
@@ -112,19 +112,19 @@ struct TranspilerTests {
         #expect(await transpileExpr("the number of words in \"hello\"") == "LingoValue.string(\"hello\").chunkCount(\"word\")")
 
         // Environment
-        #expect(await transpileExpr("member(\"btn\")") == "LingoEnvironment.shared.callGlobal(\"member\", args: [LingoValue.string(\"btn\")])")
-        #expect(await transpileExpr("sprite(1)") == "LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoValue.integer(1)])")
+        #expect(await transpileExpr("member(\"btn\")") == "environment.callGlobal(\"member\", args: [LingoValue.string(\"btn\")])")
+        #expect(await transpileExpr("sprite(1)") == "environment.callGlobal(\"sprite\", args: [LingoValue.integer(1)])")
         #expect(
             await transpileExpr("sprite(1) intersects sprite(2)")
-                == "LingoEnvironment.shared.callGlobal(\"intersects\", args: [LingoValue.integer(1), LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoValue.integer(2)])])")
+                == "environment.callGlobal(\"intersects\", args: [LingoValue.integer(1), environment.callGlobal(\"sprite\", args: [LingoValue.integer(2)])])")
         #expect(
             await transpileExpr("sprite(1) within sprite(2)")
-                == "LingoEnvironment.shared.callGlobal(\"within\", args: [LingoValue.integer(1), LingoEnvironment.shared.callGlobal(\"sprite\", args: [LingoValue.integer(2)])])")
+                == "environment.callGlobal(\"within\", args: [LingoValue.integer(1), environment.callGlobal(\"sprite\", args: [LingoValue.integer(2)])])")
 
-        #expect(await transpileExpr("the name of menu 1") == "LingoEnvironment.shared.callGlobal(\"menu\", args: [LingoValue.integer(1)]).`name`")
+        #expect(await transpileExpr("the name of menu 1") == "environment.callGlobal(\"menu\", args: [LingoValue.integer(1)]).`name`")
         #expect(
             await transpileExpr("the name of menu item 1 of menu 2")
-                == "LingoEnvironment.shared.callGlobal(\"menu\", args: [LingoEnvironment.shared.getGlobal(\"menu\").chunk(\"item\", start: LingoValue.integer(1), end: nil)]).`name`")
-        #expect(await transpileExpr("the name of sound 1") == "LingoEnvironment.shared.callGlobal(\"sound\", args: [LingoValue.integer(1)]).`name`")
+                == "environment.callGlobal(\"menu\", args: [environment.getGlobal(\"menu\").chunk(\"item\", start: LingoValue.integer(1), end: nil)]).`name`")
+        #expect(await transpileExpr("the name of sound 1") == "environment.callGlobal(\"sound\", args: [LingoValue.integer(1)]).`name`")
     }
 }

@@ -117,8 +117,77 @@ func decompileArithmeticAssignment(opcodeByte: UInt8, expectedOperator: BinaryOp
         statements == [
             .assignment(
                 target: .identifier("x"),
-                value: .call(name: "add", args: .argList([.integer(1), .integer(2)])),
+                value: .functionCall(target: nil, name: "add", arguments: [.integer(1), .integer(2)]),
                 syntax: .dot)
+        ])
+}
+
+@Test func decompileObjCallFallsBackToFunctionCallWithReceiver() throws {
+    // global obj
+    // obj.greet(5)
+    //
+    // A generic (not built-in-recognized) ObjCall always pushes its receiver
+    // as the argument list's first element, matching `LingoParser`'s only
+    // production for `receiver.method(args)`.
+    let bytes: [UInt8] = [
+        0x49, 0x00,  // GetGlobal obj
+        0x41, 0x05,  // PushInt8 5
+        0x42, 0x02,  // PushArgListNoRet 2 (obj, 5)
+        0x67, 0x01,  // ObjCall greet
+        0x01  // Ret
+    ]
+    let statements = try decompiledStatements(bytes: bytes, names: ["obj", "greet"])
+
+    #expect(
+        statements == [
+            .expressionStatement(
+                .functionCall(target: .identifier("obj"), name: "greet", arguments: [.integer(5)]))
+        ])
+}
+
+@Test func decompileObjCallV4WithGlobalReducesToBareFunctionCall() throws {
+    // global fn, x
+    // x = fn(5)
+    let bytes: [UInt8] = [
+        0x46, 0x00,  // PushVarRef fn
+        0x41, 0x05,  // PushInt8 5
+        0x43, 0x01,  // PushArgList 1
+        0x58, 0x01,  // ObjCallV4 varType=1 (global/property passthrough)
+        0x4f, 0x01,  // SetGlobal x
+        0x01  // Ret
+    ]
+    let statements = try decompiledStatements(bytes: bytes, names: ["fn", "x"])
+
+    #expect(
+        statements == [
+            .assignment(
+                target: .identifier("x"),
+                value: .functionCall(target: nil, name: "fn", arguments: [.integer(5)]),
+                syntax: .dot)
+        ])
+}
+
+@Test func decompileObjCallV4WithFieldVariableStaysUnconverted() throws {
+    // ObjCallV4 against a field variable has no simple name to fall back to
+    // `functionCall` with, so it stays as `objCallV4` — a deliberately
+    // unaddressed, rarer case distinct from the common global/local/param
+    // path above.
+    let bytes: [UInt8] = [
+        0x41, 0x01,  // PushInt8 1 (memberId)
+        0x41, 0x00,  // PushInt8 0 (castLib)
+        0x41, 0x05,  // PushInt8 5 (arg)
+        0x42, 0x01,  // PushArgListNoRet 1
+        0x58, 0x06,  // ObjCallV4 varType=6 (field)
+        0x01  // Ret
+    ]
+    let statements = try decompiledStatements(bytes: bytes, names: [])
+
+    #expect(
+        statements == [
+            .expressionStatement(
+                .objCallV4(
+                    obj: .member(type: "field", id: .integer(1), castId: .integer(0)),
+                    args: .argListNoRet([.integer(5)])))
         ])
 }
 

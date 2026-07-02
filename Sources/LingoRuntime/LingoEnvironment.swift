@@ -2,8 +2,6 @@
 // LingoRuntime module - Embedded Swift compatible
 
 public class LingoEnvironment {
-    nonisolated(unsafe) public static let shared = LingoEnvironment()
-
     private var globals: [(key: String, value: LingoValue)] = []
     private var globalFunctions: [(key: String, value: ([LingoValue]) -> LingoValue)] = []
 

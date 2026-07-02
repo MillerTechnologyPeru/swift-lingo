@@ -24,7 +24,12 @@ public enum LingoValue {
     case propertyListType(LingoPropertyListClass)
     case object(LingoObject)
     case boundMethod(LingoObject, String)
-    case globalFunction(String)
+
+    /// Embeds the resolving environment directly in the value, since
+    /// `@dynamicCallable`'s fixed `dynamicallyCall(withArguments:)` signature
+    /// leaves no room for an environment parameter at call time — the lookup
+    /// still happens by name when called, not eagerly at construction time.
+    case globalFunction(LingoEnvironment, String)
 
     public static func list(_ elements: [LingoValue]) -> LingoValue {
         return .listType(LingoListClass(elements))
@@ -168,8 +173,8 @@ public enum LingoValue {
         switch self {
         case .boundMethod(let obj, let name):
             return obj.callMethod(name, args: args)
-        case .globalFunction(let name):
-            return LingoEnvironment.shared.callGlobal(name, args: args)
+        case .globalFunction(let environment, let name):
+            return environment.callGlobal(name, args: args)
         default:
             return .void
         }

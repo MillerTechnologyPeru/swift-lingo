@@ -26,6 +26,7 @@ public enum LingoVM {
     ///   - args: Argument values, matching positionally against `handler.argumentNameIds`.
     ///   - receiver: The object this handler is running against (`me`), if any.
     ///   - host: Resolves Director-specific concepts (the movie, sprites, cast members, ...) the VM has no knowledge of. `nil` degrades every Director-specific opcode to void/no-op.
+    ///   - environment: The movie's global-variable/global-function table. Callers own its lifetime and are responsible for sharing one instance across every handler call that belongs to the same movie.
     ///   - version: The Director file format version (e.g. `500` for Director 5) — selects the variable-id scaling factor and several version-dependent bytecode shapes, matching `LingoBytecode.decompile`.
     ///   - capitalX: Whether this script's context chunk uses the newer `LctX` name-table indirection. Defaults to `false`.
     public static func call(
@@ -35,13 +36,14 @@ public enum LingoVM {
         args: [LingoValue] = [],
         receiver: LingoObject? = nil,
         host: LingoVMHost? = nil,
+        environment: LingoEnvironment,
         version: UInt16,
         capitalX: Bool = false
     ) throws -> LingoValue {
         let multiplier: UInt32 = capitalX ? 1 : (version >= 500 ? 8 : 6)
         return try call(
             handler: handler, chunk: chunk, names: names, args: args, receiver: receiver, host: host,
-            version: version, multiplier: multiplier, depth: 0)
+            environment: environment, version: version, multiplier: multiplier, depth: 0)
     }
 
     static func call(
@@ -51,13 +53,14 @@ public enum LingoVM {
         args: [LingoValue],
         receiver: LingoObject?,
         host: LingoVMHost?,
+        environment: LingoEnvironment,
         version: UInt16,
         multiplier: UInt32,
         depth: Int
     ) throws -> LingoValue {
         let executor = LingoVMExecutor(
             handler: handler, chunk: chunk, names: names, args: args, receiver: receiver, host: host,
-            version: version, multiplier: multiplier, depth: depth)
+            environment: environment, version: version, multiplier: multiplier, depth: depth)
         return try executor.run()
     }
 }

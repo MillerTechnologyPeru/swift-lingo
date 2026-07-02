@@ -5,7 +5,7 @@ import LingoRuntime
 
 @Test func newObjInstantiatesThroughHost() throws {
     let host = TestHost()
-    let created = TestReceiver()
+    let created = TestReceiver(environment: LingoEnvironment())
     // A host resolving any script name to the same pre-built instance is
     // enough to prove NewObj routes through `makeObject` rather than trying
     // to construct anything itself.
@@ -68,6 +68,92 @@ import LingoRuntime
     #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(42)))
 }
 
+@Test func tellCallRedirectsToTheWindowResolvedByHost() throws {
+    let environment = LingoEnvironment()
+    let host = TestHost(environment: environment)
+    let window = TestReceiver(environment: environment)
+    host.windows[1] = window
+
+    let executor = try makeExecutor(
+        bytes: [
+            0x41, 0x01,  // PushInt8 1 (window id)
+            0x1c,  // StartTell
+            0x43, 0x00,  // PushArgList 0
+            0x63, 0x00,  // TellCall greet
+            0x1d,  // EndTell
+            0x01  // Ret
+        ],
+        names: ["greet"], host: host, environment: environment)
+    let result = try executor.run()
+
+    #expect(LingoValue.equalsBool(lhs: result, rhs: .string("called:greet")))
+    #expect(window.lastMethodCall?.name == "greet")
+}
+
+@Test func tellCallFallsBackToGlobalDispatchOutsideATellBlock() throws {
+    let environment = LingoEnvironment()
+    environment.registerGlobalFunction("someGlobalFn") { _ in .integer(77) }
+
+    let executor = try makeExecutor(
+        bytes: [
+            0x43, 0x00,  // PushArgList 0
+            0x63, 0x00,  // TellCall someGlobalFn
+            0x01  // Ret
+        ],
+        names: ["someGlobalFn"], environment: environment)
+    let result = try executor.run()
+
+    #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(77)))
+}
+
+@Test func tellCallFallsBackWhenWindowFailsToResolve() throws {
+    let environment = LingoEnvironment()
+    let host = TestHost(environment: environment)
+    environment.registerGlobalFunction("someGlobalFn") { _ in .integer(55) }
+
+    let executor = try makeExecutor(
+        bytes: [
+            0x41, 0x63,  // PushInt8 99 (unregistered window id)
+            0x1c,  // StartTell
+            0x43, 0x00,  // PushArgList 0
+            0x63, 0x00,  // TellCall someGlobalFn
+            0x1d,  // EndTell
+            0x01  // Ret
+        ],
+        names: ["someGlobalFn"], host: host, environment: environment)
+    let result = try executor.run()
+
+    #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(55)))
+}
+
+@Test func nestedTellBlocksRestoreTheOuterTargetAfterEndTell() throws {
+    let environment = LingoEnvironment()
+    let host = TestHost(environment: environment)
+    let outerWindow = TestReceiver(environment: environment)
+    let innerWindow = TestReceiver(environment: environment)
+    host.windows[1] = outerWindow
+    host.windows[2] = innerWindow
+
+    let executor = try makeExecutor(
+        bytes: [
+            0x41, 0x01,  // PushInt8 1 (outer window id)
+            0x1c,  // StartTell (outer)
+            0x41, 0x02,  // PushInt8 2 (inner window id)
+            0x1c,  // StartTell (inner)
+            0x1d,  // EndTell (pop inner)
+            0x43, 0x00,  // PushArgList 0
+            0x63, 0x00,  // TellCall greet -- redirects to the outer target
+            0x1d,  // EndTell (pop outer)
+            0x01  // Ret
+        ],
+        names: ["greet"], host: host, environment: environment)
+    let result = try executor.run()
+
+    #expect(LingoValue.equalsBool(lhs: result, rhs: .string("called:greet")))
+    #expect(outerWindow.lastMethodCall?.name == "greet")
+    #expect(innerWindow.lastMethodCall == nil)
+}
+
 @Test func callJavaScriptIsANoOp() throws {
     let executor = try makeExecutor(bytes: [0x41, 0x07, 0x26, 0x01])  // PushInt8 7, CallJavaScript, Ret
     let result = try executor.run()
@@ -78,7 +164,7 @@ import LingoRuntime
 /// A host that always resolves `makeObject` to a fixed instance, regardless
 /// of script name or arguments.
 private final class InstantiatingHost: LingoVMHost {
-    let movie: LingoObject = TestReceiver()
+    let movie: LingoObject = TestReceiver(environment: LingoEnvironment())
     let objectToReturn: LingoObject
 
     init(objectToReturn: LingoObject) {

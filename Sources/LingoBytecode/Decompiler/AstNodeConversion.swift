@@ -142,12 +142,56 @@ extension AstNode {
                 spriteId: spriteID.asExpression(syntax: syntax), prop: PropertyNames.spriteProperty(prop))
 
         case .call(let name, let args):
-            return .call(name: name, args: args.asExpression(syntax: syntax))
+            // `LocalCall`/`ExtCall`/`TellCall` always push their arguments as
+            // a single `argList`/`argListNoRet` node; unwrap it to the plain
+            // array `functionCall` expects. `LingoParser` never produces a
+            // dedicated "bare call" expression of its own — parenthesized
+            // call syntax always parses to `functionCall(target: nil, ...)`
+            // regardless of whether the call is used for its value or as a
+            // standalone statement — so this is the only shape a decompiled
+            // call can round-trip through source text as.
+            return .functionCall(target: nil, name: name, arguments: argListItems(args, syntax: syntax))
 
         case .objCall(let name, let args):
-            return .objCall(name: name, args: args.asExpression(syntax: syntax))
+            // A generic (not built-in-recognized) `ObjCall` always pushes its
+            // receiver as the first element of the argument list — confirmed
+            // by the bytecode's own stack convention — so `items.first` is
+            // the receiver, matching `LingoParser`'s only production for
+            // `receiver.method(args)`: `functionCall(target: receiver, ...)`.
+            // `LingoParser` has no dedicated "object call" expression of its
+            // own, so this is the only shape it can round-trip through
+            // source text as.
+            let items = argListItems(args, syntax: syntax)
+            guard let target = items.first else {
+                return .functionCall(target: nil, name: name, arguments: [])
+            }
+            return .functionCall(target: target, name: name, arguments: Array(items.dropFirst()))
 
         case .objCallV4(let obj, let args):
+            // `obj` is a variable reference (`readVar`'s output) invoked
+            // directly as a callable, with no method name of its own. Lingo
+            // source can only produce this shape as a bare-identifier call
+            // (`fn(args)`), which `LingoParser` parses as
+            // `functionCall(target: nil, name: fn, arguments:)` — so that
+            // mapping only applies when `obj` actually reduces to a plain
+            // variable name (either `.variable`, from a preceding
+            // `GetGlobal`/`GetLocal`/`GetParam`, or `.literal(.varRef)`, from
+            // a preceding `PushVarRef` — both convert to the same
+            // `Expression.identifier` shape, just via different bytecode
+            // paths). `readVar`'s field/member-variable case (and any other
+            // shape) has no simple name to use this way, and is left as
+            // `objCallV4` rather than forced into a shape that would
+            // round-trip to something else entirely.
+            let objName: String?
+            switch obj {
+            case .variable(let name): objName = name
+            case .literal(let datum) where datum.datumType == .varRef: objName = datum.stringValue
+            default: objName = nil
+            }
+            if let objName {
+                return .functionCall(
+                    target: nil, name: objName, arguments: argListItems(args, syntax: syntax))
+            }
             return .objCallV4(obj: obj.asExpression(syntax: syntax), args: args.asExpression(syntax: syntax))
 
         case .newObj(let objType, let args):
@@ -248,6 +292,18 @@ extension AstNode {
         default:
             return .expressionStatement(asExpression(syntax: syntax))
         }
+    }
+}
+
+/// Unwraps a `call`'s pushed-argument-list node down to its plain element
+/// array, since `LingoAST.Expression.functionCall`'s `arguments` is `[Expression]`
+/// rather than a nested `argList`/`argListNoRet` node.
+private func argListItems(_ args: AstNode, syntax: LingoSyntax) -> [Expression] {
+    switch args.asExpression(syntax: syntax) {
+    case .argList(let items), .argListNoRet(let items):
+        return items
+    case let other:
+        return [other]
     }
 }
 
