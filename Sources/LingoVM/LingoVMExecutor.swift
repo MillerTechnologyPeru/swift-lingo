@@ -473,16 +473,22 @@ final class LingoVMExecutor {
         return .advance
     }
 
-    /// Recognizes the handful of built-in list methods with dedicated
-    /// `LingoValue` primitives (mirroring the same special-casing the
-    /// decompiler applies for readability); anything else dispatches
+    /// Recognizes the handful of built-in list/property methods with
+    /// dedicated `LingoValue` primitives (mirroring the same special-casing
+    /// the decompiler applies for readability); anything else dispatches
     /// generically to the receiver's `callMethod`, matching how `ObjCall`'s
     /// argument list always carries the receiver as its first element.
     ///
-    /// `getProp`/`getPropRef`/`setProp`/`setContents*` — also special-cased
-    /// by the decompiler — are still deferred: they need either list
-    /// double-index ranges or a live variable reference (see the
-    /// `PushVarRef` trade-off).
+    /// `hilite`/`delete`/`setContents*`/`setProp`'s double-index-range form
+    /// — also special-cased by the decompiler — are still deferred with an
+    /// explicit no-op rather than falling through to the generic dispatch
+    /// above: `args[0]` for these is a chunk/variable reference rather than
+    /// a receiver object, so treating it as one and calling a method
+    /// literally named e.g. `"hilite"` on it would silently do the wrong
+    /// thing on the rare occasion `args[0]` happens to itself be an object.
+    /// Properly supporting them needs a live variable reference (see the
+    /// `PushVarRef` trade-off) or (for `setProp`'s range form) a
+    /// `LingoValue` range-assignment primitive that doesn't exist yet.
     private func dispatchObjCall(method: String, argList: LingoValue) -> LingoValue {
         let args = argList.asSequence()
         let nargs = args.count
@@ -497,6 +503,19 @@ final class LingoVMExecutor {
             if case .symbol(let propName) = args[1], case .object(let object) = args[0] {
                 return object.getProperty(propName).count
             }
+        case ("getProp", 3), ("getProp", 4), ("getPropRef", 3), ("getPropRef", 4):
+            if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
+                let value = object.getProperty(propName)
+                return nargs == 4 ? value.getRange(start: args[2], end: args[3]) : value[args[2]]
+            }
+        case ("setProp", 4):
+            if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
+                object.getProperty(propName).setElement(index: args[2], value: args[3])
+                return .void
+            }
+        case ("hilite", 1), ("delete", 1), ("setProp", 5),
+            ("setContents", 2), ("setContentsAfter", 2), ("setContentsBefore", 2):
+            return .void
         default:
             break
         }
