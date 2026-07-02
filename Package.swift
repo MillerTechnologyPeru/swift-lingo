@@ -18,7 +18,8 @@ let package = Package(
         .library(name: "LingoRuntime", targets: ["LingoRuntime"]),
         .library(name: "LingoAST", targets: ["LingoAST"]),
         .library(name: "LingoParser", targets: ["LingoParser"]),
-        .library(name: "LingoBytecode", targets: ["LingoBytecode"])
+        .library(name: "LingoBytecode", targets: ["LingoBytecode"]),
+        .library(name: "LingoVM", targets: ["LingoVM"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
@@ -101,6 +102,20 @@ let package = Package(
         .testTarget(
             name: "LingoRuntimeTests",
             dependencies: ["LingoRuntime"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        // Virtual Machine (Library)
+        .target(
+            name: "LingoVM",
+            dependencies: ["LingoBytecode", "LingoRuntime"],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        .testTarget(
+            name: "LingoVMTests",
+            dependencies: [
+                "LingoVM", "LingoBytecode", "LingoRuntime",
+                .product(name: "BinaryParsing", package: "swift-binary-parsing")
+            ],
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         )
     ]

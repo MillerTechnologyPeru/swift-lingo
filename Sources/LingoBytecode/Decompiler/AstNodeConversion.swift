@@ -125,18 +125,21 @@ extension AstNode {
                 type: chunkType.lingoASTChunkType, obj: obj.asExpression(syntax: syntax))
 
         case .menuProp(let menuID, let prop):
-            return .menuProp(menuId: menuID.asExpression(syntax: syntax), prop: menuPropName(prop))
+            return .menuProp(
+                menuId: menuID.asExpression(syntax: syntax), prop: PropertyNames.menuProperty(prop))
 
         case .menuItemProp(let menuID, let itemID, let prop):
             return .menuItemProp(
                 menuId: menuID.asExpression(syntax: syntax), itemId: itemID.asExpression(syntax: syntax),
-                prop: menuItemPropName(prop))
+                prop: PropertyNames.menuItemProperty(prop))
 
         case .soundProp(let soundID, let prop):
-            return .soundProp(soundId: soundID.asExpression(syntax: syntax), prop: soundPropName(prop))
+            return .soundProp(
+                soundId: soundID.asExpression(syntax: syntax), prop: PropertyNames.soundProperty(prop))
 
         case .spriteProp(let spriteID, let prop):
-            return .spriteProp(spriteId: spriteID.asExpression(syntax: syntax), prop: spritePropName(prop))
+            return .spriteProp(
+                spriteId: spriteID.asExpression(syntax: syntax), prop: PropertyNames.spriteProperty(prop))
 
         case .call(let name, let args):
             return .call(name: name, args: args.asExpression(syntax: syntax))
@@ -305,66 +308,6 @@ private func binaryOperator(for opcode: OpCode) -> BinaryOperator {
     case .or: return .logicalOr
     case .containsStr, .contains0Str: return .contains
     default: return .equals  // unreachable: DecompilerState only builds .binaryOp with the opcodes above
-    }
-}
-
-private func menuPropName(_ prop: UInt32) -> String {
-    switch prop {
-    case 0x01: return "name"
-    case 0x02: return "number"
-    default: return "menuProp_\(prop)"
-    }
-}
-
-private func menuItemPropName(_ prop: UInt32) -> String {
-    switch prop {
-    case 0x01: return "name"
-    case 0x02: return "checkMark"
-    case 0x03: return "enabled"
-    case 0x04: return "script"
-    default: return "menuItemProp_\(prop)"
-    }
-}
-
-private func soundPropName(_ prop: UInt32) -> String {
-    switch prop {
-    case 0x01: return "volume"
-    default: return "soundProp_\(prop)"
-    }
-}
-
-private func spritePropName(_ prop: UInt32) -> String {
-    switch prop {
-    case 0x01: return "type"
-    case 0x02: return "backColor"
-    case 0x03: return "bottom"
-    case 0x04: return "castNum"
-    case 0x05: return "constraint"
-    case 0x06: return "cursor"
-    case 0x07: return "foreColor"
-    case 0x08: return "height"
-    case 0x09: return "immediate"
-    case 0x0a: return "ink"
-    case 0x0b: return "left"
-    case 0x0c: return "lineSize"
-    case 0x0d: return "locH"
-    case 0x0e: return "locV"
-    case 0x0f: return "moveableSprite"
-    case 0x10: return "pattern"
-    case 0x11: return "puppet"
-    case 0x12: return "right"
-    case 0x13: return "scriptNum"
-    case 0x14: return "stretch"
-    case 0x15: return "top"
-    case 0x16: return "trails"
-    case 0x17: return "visible"
-    case 0x18: return "width"
-    case 0x19: return "blend"
-    case 0x1a: return "scriptInstanceList"
-    case 0x1b: return "loc"
-    case 0x1c: return "rect"
-    case 0x1d: return "member"
-    default: return "spriteProp_\(prop)"
     }
 }
 

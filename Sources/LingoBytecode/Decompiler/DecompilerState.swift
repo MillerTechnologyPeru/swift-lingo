@@ -1017,7 +1017,7 @@ final class DecompilerState {
         switch propertyType {
         case 0x00:
             if propertyID <= 0x0b {
-                return .the(moviePropertyName(propertyID))
+                return .the(PropertyNames.movieProperty(propertyID))
             }
             let string = pop()
             let chunkType = Self.v4ChunkType(propertyID - 0x0b)
@@ -1045,10 +1045,10 @@ final class DecompilerState {
             return .spriteProp(spriteID: pop(), prop: UInt32(bitPattern: propertyID))
 
         case 0x07:
-            return .the(animationPropertyName(propertyID))
+            return .the(PropertyNames.animationProperty(propertyID))
 
         case 0x08:
-            let propName = animation2PropertyName(propertyID)
+            let propName = PropertyNames.animation2Property(propertyID)
             if propertyID == 0x02, version >= 500 {
                 let castLib = pop()
                 let isZero: Bool
@@ -1065,7 +1065,7 @@ final class DecompilerState {
             return .the(propName)
 
         case 0x09...0x15:
-            let propName = memberPropertyName(propertyID)
+            let propName = PropertyNames.memberProperty(propertyID)
             let castId: AstNode? = version >= 500 ? pop() : nil
             let memberId = pop()
             let prefix: String
@@ -1134,73 +1134,6 @@ private func isZero(_ node: AstNode) -> Bool {
         return datum.datumType == .int && datum.intValue == 0
     }
     return false
-}
-
-private func moviePropertyName(_ id: Int32) -> String {
-    switch id {
-    case 0x01: return "floatPrecision"
-    case 0x02: return "mouseDownScript"
-    case 0x03: return "mouseUpScript"
-    case 0x04: return "keyDownScript"
-    case 0x05: return "keyUpScript"
-    case 0x06: return "timeoutScript"
-    case 0x07: return "short time"
-    case 0x08: return "abbr time"
-    case 0x09: return "long time"
-    case 0x0a: return "short date"
-    case 0x0b: return "abbr date"
-    default: return "movieProp_\(id)"
-    }
-}
-
-private func animationPropertyName(_ id: Int32) -> String {
-    switch id {
-    case 0x01: return "beepOn"
-    case 0x02: return "buttonStyle"
-    case 0x03: return "centerStage"
-    case 0x04: return "checkBoxAccess"
-    case 0x05: return "checkBoxType"
-    case 0x06: return "colorDepth"
-    case 0x07: return "colorQD"
-    case 0x08: return "exitLock"
-    case 0x09: return "fixStageSize"
-    case 0x0a: return "fullColorPermit"
-    case 0x0b: return "imageDirect"
-    case 0x0c: return "doubleClick"
-    default: return "animProp_\(id)"
-    }
-}
-
-private func animation2PropertyName(_ id: Int32) -> String {
-    switch id {
-    case 0x01, 0x02: return "the number of castMembers"
-    case 0x03: return "the number of menus"
-    default: return "anim2Prop_\(id)"
-    }
-}
-
-private func memberPropertyName(_ id: Int32) -> String {
-    switch id {
-    case 0x01: return "name"
-    case 0x02: return "text"
-    case 0x03: return "textStyle"
-    case 0x04: return "textFont"
-    case 0x05: return "textHeight"
-    case 0x06: return "textAlign"
-    case 0x07: return "textSize"
-    case 0x08: return "picture"
-    case 0x09: return "hilite"
-    case 0x0a: return "number"
-    case 0x0b: return "size"
-    case 0x0c: return "loop"
-    case 0x0d: return "duration"
-    case 0x0e: return "controller"
-    case 0x0f: return "directToStage"
-    case 0x10: return "sound"
-    case 0x11: return "foreColor"
-    case 0x12: return "backColor"
-    default: return "memberProp_\(id)"
-    }
 }
 
 extension Array {
