@@ -33,11 +33,11 @@ import LingoAST
     #expect(
         statements == [
             .expressionStatement(
-                .call(
-                    name: "beep",
-                    args: .argListNoRet([
+                .functionCall(
+                    target: nil, name: "beep",
+                    arguments: [
                         .binaryOperation(left: .integer(1), operator: .add, right: .integer(2))
-                    ])))
+                    ]))
         ])
 }
 

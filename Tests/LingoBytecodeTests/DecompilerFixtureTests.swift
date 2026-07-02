@@ -117,7 +117,7 @@ func decompileArithmeticAssignment(opcodeByte: UInt8, expectedOperator: BinaryOp
         statements == [
             .assignment(
                 target: .identifier("x"),
-                value: .call(name: "add", args: .argList([.integer(1), .integer(2)])),
+                value: .functionCall(target: nil, name: "add", arguments: [.integer(1), .integer(2)]),
                 syntax: .dot)
         ])
 }

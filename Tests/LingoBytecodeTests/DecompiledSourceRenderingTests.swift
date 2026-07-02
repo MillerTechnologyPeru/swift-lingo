@@ -106,19 +106,9 @@ private func renderAndReparse(
     #expect(reparsed.statements == [.handler(name: "writeProp", arguments: [], body: body)])
 }
 
-@Test func renderedLocalHandlerCallReparsesToEquivalentFunctionCall() async throws {
+@Test func renderedLocalHandlerCallReparsesIdentically() async throws {
     // global x
     // x = add(1, 2)
-    //
-    // `LingoBytecode.decompile` represents both `LocalCall` and `ExtCall` as
-    // `Expression.call(name:args: .argList(...))`, which always renders with
-    // parentheses (`"add(1, 2)"`). `LingoParser` treats a parenthesized
-    // call as `Expression.functionCall`, not `.call` (the latter is reserved
-    // for paren-less command syntax like `put 1 into x`), so this is a
-    // pre-existing, deterministic divergence between the two `Expression`
-    // producers for every decompiled call — not a rendering defect. This
-    // test documents the actual round-tripped shape rather than asserting a
-    // byte-for-byte match that the current AST can't achieve.
     let addHandler = HandlerDef(
         nameId: 1, bytecodeArray: [], argumentNameIds: [], localNameIds: [], globalNameIds: [])
     let bytes: [UInt8] = [
@@ -133,18 +123,7 @@ private func renderAndReparse(
     let (source, reparsed, skipped) = await renderAndReparse(handlerName: "useAdd", body: body)
 
     #expect(skipped == 0, "Unexpected skipped tokens rendering:\n\(source)")
-    #expect(
-        reparsed.statements == [
-            .handler(
-                name: "useAdd", arguments: [],
-                body: [
-                    .assignment(
-                        target: .identifier("x"),
-                        value: .functionCall(
-                            target: nil, name: "add", arguments: [.integer(1), .integer(2)]),
-                        syntax: .dot)
-                ])
-        ])
+    #expect(reparsed.statements == [.handler(name: "useAdd", arguments: [], body: body)])
 }
 
 @Test func renderedRepeatWhileLoopReparsesIdentically() async throws {
