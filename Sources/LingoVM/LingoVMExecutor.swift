@@ -235,10 +235,12 @@ final class LingoVMExecutor {
             push(LingoEnvironment.shared.getGlobal(getName(obj)))
 
         case .pushVarRef:
-            // Resolves to the variable's current value rather than a live
-            // reference — see the `LingoVMHost`-adjacent trade-off note on
-            // `LingoVM`. Globals are the common case for a named var-ref.
-            push(LingoEnvironment.shared.getGlobal(getName(obj)))
+            // Pushes the variable's *name*, not its value — matching the
+            // decompiler's own `Datum.varRef(name)` modeling. `Put`/
+            // `PutChunk`/`DeleteChunk` need the name to identify where to
+            // write back to; anything that wants the current value instead
+            // reads through the name itself afterward.
+            push(.symbol(getName(obj)))
 
         case .pushChunkVarRef:
             push(try readVar(varType: obj))
@@ -333,6 +335,134 @@ final class LingoVMExecutor {
             let value = try pop()
             try setV4Property(propertyType: obj, propertyID: Int32(propId.asInteger() ?? 0), value: value)
 
+        case .joinStr:
+            let b = try pop()
+            let a = try pop()
+            push(a.concat(b))
+
+        case .joinPadStr:
+            let b = try pop()
+            let a = try pop()
+            push(a.concatSpace(b))
+
+        case .containsStr, .contains0Str:
+            // The reference distinguishes these by the operands' static
+            // type (string vs. list); `LingoValue.contains` already
+            // dispatches on the runtime value for both, so one
+            // implementation covers both opcodes.
+            let b = try pop()
+            let a = try pop()
+            push(a.contains(b))
+
+        case .getChunk:
+            let string = try pop()
+            if let range = try popChunkRangeSelector() {
+                push(string.chunk(range.type, start: range.first, end: range.last))
+            } else {
+                push(string)
+            }
+
+        case .getField:
+            let castId: LingoValue? = version >= 500 ? try pop() : nil
+            let fieldId = try pop()
+            if let object = host?.member(fieldId, castLib: castId) {
+                push(.object(object))
+            } else {
+                push(.void)
+            }
+
+        case .put:
+            // Operand pop order matches the decompiler exactly: the
+            // variable-identifying operands first (via `readVarTarget`),
+            // the value last.
+            let target = try readVarTarget(varType: obj & 0xF)
+            let value = try pop()
+            if let target {
+                switch (obj >> 4) & 0xF {
+                case 1: writeVariable(target, value: value)  // into
+                case 2: writeVariable(target, value: readVariable(target).concat(value))  // after
+                case 3: writeVariable(target, value: value.concat(readVariable(target)))  // before
+                default: writeVariable(target, value: value)
+                }
+            }
+
+        case .putChunk:
+            let target = try readVarTarget(varType: obj & 0xF)
+            let range = try popChunkRangeSelector()
+            let value = try pop()
+            if let target, let range {
+                let current = readVariable(target)
+                let existingChunk = current.chunk(range.type, start: range.first, end: range.last)
+                let newChunkContent: LingoValue
+                switch (obj >> 4) & 0xF {
+                case 2: newChunkContent = existingChunk.concat(value)  // after
+                case 3: newChunkContent = value.concat(existingChunk)  // before
+                default: newChunkContent = value  // into
+                }
+                writeVariable(
+                    target,
+                    value: current.settingChunk(
+                        range.type, start: range.first, end: range.last, value: newChunkContent))
+            }
+
+        case .deleteChunk:
+            let target = try readVarTarget(varType: obj)
+            let range = try popChunkRangeSelector()
+            if let target, let range {
+                let current = readVariable(target)
+                writeVariable(
+                    target,
+                    value: current.settingChunk(
+                        range.type, start: range.first, end: range.last, value: .string("")))
+            }
+
+        case .hiliteChunk:
+            // A UI side effect (highlighting text in a live field member)
+            // with no meaningful return value and no host hook yet — the
+            // operands still have to be consumed for stack balance.
+            let castId: LingoValue? = version >= 500 ? try pop() : nil
+            _ = castId
+            _ = try pop()  // fieldId
+            _ = try popChunkRangeSelector()
+
+        case .ontoSpr:
+            let second = try pop()
+            let first = try pop()
+            push(.integer(resolveSpriteCollision(first, second, using: { host?.spriteIntersects($0, $1) }) ? 1 : 0))
+
+        case .intoSpr:
+            let second = try pop()
+            let first = try pop()
+            push(.integer(resolveSpriteCollision(first, second, using: { host?.spriteWithin($0, $1) }) ? 1 : 0))
+
+        case .theBuiltin:
+            _ = try pop()  // empty arglist
+            push(host?.movie.getProperty(getName(obj)) ?? .void)
+
+        case .newObj:
+            let objArgs = try pop()
+            if let object = host?.makeObject(scriptName: getName(obj), args: objArgs.asSequence()) {
+                push(.object(object))
+            } else {
+                push(.void)
+            }
+
+        case .startTell:
+            // A real `tell` redirects subsequent message sends (ExtCall/
+            // ObjCall) to a different window for the duration of the block.
+            // `LingoVMHost` has no hook for that yet, so this only consumes
+            // the operand for stack balance — `tellCall` already collapses
+            // to a plain global dispatch for the same reason (see there).
+            _ = try pop()  // window
+
+        case .endTell:
+            break  // no state to unwind without a tell-target stack
+
+        case .callJavaScript:
+            // Unimplemented in the reference too (warning-only stub) — no
+            // operands are known to pop here, so this is a pure no-op.
+            break
+
         default:
             throw LingoVMError.unknownOpcode(bytecode.opcode)
         }
@@ -346,11 +476,10 @@ final class LingoVMExecutor {
     /// generically to the receiver's `callMethod`, matching how `ObjCall`'s
     /// argument list always carries the receiver as its first element.
     ///
-    /// `getProp`/`getPropRef`/`setProp`/`setContents*`/`hilite`/`delete` —
-    /// also special-cased by the decompiler — are deferred: the first four
-    /// need either list double-index ranges or a live variable reference
-    /// (see the `PushVarRef` trade-off), and the last two need the chunk
-    /// support `DeleteChunk`/`HiliteChunk` add in a later step.
+    /// `getProp`/`getPropRef`/`setProp`/`setContents*` — also special-cased
+    /// by the decompiler — are still deferred: they need either list
+    /// double-index ranges or a live variable reference (see the
+    /// `PushVarRef` trade-off).
     private func dispatchObjCall(method: String, argList: LingoValue) -> LingoValue {
         let args = argList.asSequence()
         let nargs = args.count
@@ -608,10 +737,10 @@ final class LingoVMExecutor {
     }
 
     /// Resolves a variable reference of the given kind (global/property,
-    /// argument, local, or field), popping whichever operands that kind
-    /// needs. Used by opcodes that encode the variable dynamically via the
-    /// stack rather than through their own `obj` operand (`PushChunkVarRef`,
-    /// and — in later steps — `Put`/`PutChunk`/`DeleteChunk`).
+    /// argument, local, or field) to its *current value*, popping whichever
+    /// operands that kind needs. Used by opcodes that encode the variable
+    /// dynamically via the stack rather than through their own `obj`
+    /// operand (`PushChunkVarRef`, `ObjCallV4`).
     func readVar(varType: Int64) throws -> LingoValue {
         let castId: LingoValue? = (varType == 0x6 && version >= 500) ? try pop() : nil
         let id = try pop()
@@ -631,6 +760,86 @@ final class LingoVMExecutor {
         default:
             return .void
         }
+    }
+
+    /// A variable's write-back location — a different question from
+    /// `readVar`'s "what is this variable's current value?". `Put`/
+    /// `PutChunk`/`DeleteChunk` need somewhere to write the result, which
+    /// `readVar`'s value-only resolution can't express. A field's location
+    /// is represented by its `text` property, matching how field content is
+    /// otherwise addressed as a `LingoObject` property.
+    enum VariableTarget {
+        case global(String)
+        case property(String)
+        case argument(Int)
+        case local(Int)
+        case field(LingoObject)
+    }
+
+    /// Identifies a write-back target of the given kind, popping whichever
+    /// operands that kind needs. Global/property targets are identified by
+    /// the *name* a preceding `PushVarRef`-style push already put on the
+    /// stack (a `.symbol`), not a resolved value.
+    private func readVarTarget(varType: Int64) throws -> VariableTarget? {
+        let castId: LingoValue? = (varType == 0x6 && version >= 500) ? try pop() : nil
+        let id = try pop()
+
+        switch varType {
+        case 0x1:
+            if case .symbol(let name) = id { return .global(name) }
+            return nil
+        case 0x2, 0x3:
+            if case .symbol(let name) = id { return .property(name) }
+            return nil
+        case 0x4:
+            guard let raw = id.asInteger() else { return nil }
+            return .argument(variableSlotIndex(Int64(raw)))
+        case 0x5:
+            guard let raw = id.asInteger() else { return nil }
+            return .local(variableSlotIndex(Int64(raw)))
+        case 0x6:
+            guard let object = host?.member(id, castLib: castId) else { return nil }
+            return .field(object)
+        default:
+            return nil
+        }
+    }
+
+    private func readVariable(_ target: VariableTarget) -> LingoValue {
+        switch target {
+        case .global(let name): return LingoEnvironment.shared.getGlobal(name)
+        case .property(let name): return receiver?.getProperty(name) ?? .void
+        case .argument(let index): return args[safe: index] ?? .void
+        case .local(let index): return locals[safe: index] ?? .void
+        case .field(let object): return object.getProperty("text")
+        }
+    }
+
+    private func writeVariable(_ target: VariableTarget, value: LingoValue) {
+        switch target {
+        case .global(let name):
+            LingoEnvironment.shared.setGlobal(name, value)
+        case .property(let name):
+            receiver?.setProperty(name, value: value)
+        case .argument(let index):
+            while args.count <= index { args.append(.void) }
+            args[index] = value
+        case .local(let index):
+            if locals.indices.contains(index) { locals[index] = value }
+        case .field(let object):
+            object.setProperty("text", value: value)
+        }
+    }
+
+    /// `OntoSpr`/`IntoSpr` (sprite collision) resolve entirely through the
+    /// host — the VM has no geometry logic of its own. Missing/non-object
+    /// operands mean "no collision", matching the reference's own
+    /// soft-fail convention.
+    private func resolveSpriteCollision(
+        _ a: LingoValue, _ b: LingoValue, using test: (LingoObject, LingoObject) -> Bool?
+    ) -> Bool {
+        guard case .object(let objA) = a, case .object(let objB) = b else { return false }
+        return test(objA, objB) ?? false
     }
 
     // MARK: - Name / literal resolution
