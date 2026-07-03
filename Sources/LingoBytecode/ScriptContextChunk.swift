@@ -64,7 +64,11 @@ public struct ScriptContextChunk: Equatable, Sendable {
             let freePointer = try UInt16(parsingBigEndian: &headerSpan)
 
             let offsetInBuffer = entriesOffset - input.startPosition
-            guard offsetInBuffer >= 0, offsetInBuffer < rawBuffer.count else {
+            // `<=` (not `<`): a cast with zero scripts stores entryCount == 0
+            // with entriesOffset pointing exactly one-past-the-end of the
+            // chunk. Nothing is ever read from there in that case, so it's a
+            // valid pointer, not an out-of-range one.
+            guard offsetInBuffer >= 0, offsetInBuffer <= rawBuffer.count else {
                 throw LingoBytecodeError.invalidOffset(entriesOffset)
             }
             var entriesSpan = unsafe ParserSpan(
