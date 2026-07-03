@@ -56,3 +56,30 @@ import BinaryParsing
     #expect(chunk.sectionMap[1].unknown0 == 2)
     #expect(chunk.sectionMap[1].sectionId == -2)
 }
+
+@Test func scriptContextChunkWithNoEntriesAtChunkEnd() throws {
+    // A cast with zero scripts stores entryCount == 0 and entriesOffset
+    // pointing exactly one-past-the-end of the chunk (42, the header's own
+    // size, with no entries following). That's a valid empty section map,
+    // not an out-of-range offset, since nothing is ever read from it.
+    let bytes: [UInt8] = [
+        0x00, 0x00, 0x00, 0x00,  // unknown0
+        0x00, 0x00, 0x00, 0x00,  // unknown1
+        0x00, 0x00, 0x00, 0x00,  // entryCount = 0
+        0x00, 0x00, 0x00, 0x00,  // entryCount2 = 0
+        0x00, 0x2A,  // entriesOffset = 42 (== chunk length)
+        0x00, 0x00,  // unknown2
+        0x00, 0x00, 0x00, 0x00,  // unknown3
+        0x00, 0x00, 0x00, 0x00,  // unknown4
+        0x00, 0x00, 0x00, 0x00,  // unknown5
+        0x00, 0x00, 0x00, 0x0A,  // lnamSectionId = 10
+        0x00, 0x00,  // validCount = 0
+        0x00, 0x00,  // flags = 0
+        0x00, 0x00  // freePointer = 0
+    ]
+    let chunk = try [UInt8](bytes).withParserSpan { span in
+        try ScriptContextChunk.read(from: span)
+    }
+    #expect(chunk.entryCount == 0)
+    #expect(chunk.sectionMap.isEmpty)
+}
