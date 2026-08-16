@@ -224,6 +224,11 @@ public enum LingoValue {
     // MARK: - Relational Operators (Bool returning)
 
     /// Performs a deep equality comparison and returns a Bool.
+    ///
+    /// VOID equals 0 (`if n = 0` guards where `n` was never set take the
+    /// then-branch, as they do in Director), and a numeric string equals the
+    /// number it spells (`"2" = 2`). Both match dirplayer-rs's reference
+    /// `datum_equals`.
     public static func equalsBool(lhs: LingoValue, rhs: LingoValue) -> Bool {
         switch (lhs, rhs) {
         case (.void, .void): return true
@@ -231,6 +236,12 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return l == r
         case (.integer(let l), .float(let r)): return Double(l) == r
         case (.float(let l), .integer(let r)): return l == Double(r)
+        case (.integer(let l), .void), (.void, .integer(let l)): return l == 0
+        case (.float(let l), .void), (.void, .float(let l)): return l == 0
+        case (.integer(let l), .string(let s)), (.string(let s), .integer(let l)):
+            return Int(s) == l
+        case (.float(let l), .string(let s)), (.string(let s), .float(let l)):
+            return Double(s) == l
         case (.string(let l), .string(let r)): return l.caseInsensitiveEquals(r)
         case (.symbol(let l), .symbol(let r)): return l.caseInsensitiveEquals(r)
         case (.symbol(let l), .string(let r)): return l.caseInsensitiveEquals(r)
@@ -252,15 +263,80 @@ public enum LingoValue {
     }
 
     /// Performs a less-than comparison and returns a Bool.
+    ///
+    /// Ordering follows dirplayer-rs's reference `datum_less_than`: VOID
+    /// sorts below every number, a symbol orders as its name, a numeric
+    /// string orders as the number it spells, and an incomparable pair is
+    /// simply not less-than. `>` has its own mirror rather than being
+    /// derived as "not less and not equal" — that derivation made every
+    /// incomparable pair *greater*, which is how `repeat while
+    /// someVoid > 0` once span forever.
     public static func lessThanBool(lhs: LingoValue, rhs: LingoValue) -> Bool {
+        // A symbol compares as its string name.
+        if case .symbol(let name) = lhs { return lessThanBool(lhs: .string(name), rhs: rhs) }
+        if case .symbol(let name) = rhs { return lessThanBool(lhs: lhs, rhs: .string(name)) }
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return l < r
         case (.float(let l), .float(let r)): return l < r
         case (.integer(let l), .float(let r)): return Double(l) < r
         case (.float(let l), .integer(let r)): return l < Double(r)
+        case (.void, .integer), (.void, .float): return true
+        case (.integer(let l), .void): return l < 0
+        case (.float(let l), .void): return l < 0
+        case (.integer(let l), .string(let s)):
+            return stringNumberOrdering(s, Double(l), "\(l)") > 0
+        case (.float(let l), .string(let s)):
+            return stringNumberOrdering(s, l, "\(l)") > 0
+        case (.string(let s), .integer(let r)):
+            return stringNumberOrdering(s, Double(r), "\(r)") < 0
+        case (.string(let s), .float(let r)):
+            return stringNumberOrdering(s, r, "\(r)") < 0
         case (.string(let l), .string(let r)): return l.caseInsensitiveLessThan(r)
-        default: return false  // fallback
+        default: return false
         }
+    }
+
+    /// The greater-than mirror of `lessThanBool` — its own arms, not a
+    /// derivation, so an incomparable pair is not greater-than either.
+    public static func greaterThanBool(lhs: LingoValue, rhs: LingoValue) -> Bool {
+        if case .symbol(let name) = lhs { return greaterThanBool(lhs: .string(name), rhs: rhs) }
+        if case .symbol(let name) = rhs { return greaterThanBool(lhs: lhs, rhs: .string(name)) }
+        switch (lhs, rhs) {
+        case (.integer(let l), .integer(let r)): return l > r
+        case (.float(let l), .float(let r)): return l > r
+        case (.integer(let l), .float(let r)): return Double(l) > r
+        case (.float(let l), .integer(let r)): return l > Double(r)
+        case (.void, .integer), (.void, .float): return false
+        case (.integer(let l), .void): return l > 0
+        case (.float(let l), .void): return l > 0
+        case (.integer(let l), .string(let s)):
+            return stringNumberOrdering(s, Double(l), "\(l)") < 0
+        case (.float(let l), .string(let s)):
+            return stringNumberOrdering(s, l, "\(l)") < 0
+        case (.string(let s), .integer(let r)):
+            return stringNumberOrdering(s, Double(r), "\(r)") > 0
+        case (.string(let s), .float(let r)):
+            return stringNumberOrdering(s, r, "\(r)") > 0
+        case (.string(let l), .string(let r)): return r.caseInsensitiveLessThan(l)
+        default: return false
+        }
+    }
+
+    /// Orders `text` against `number`: numerically when the text parses as
+    /// a number, else lexicographically against the number's own spelling.
+    /// Returns -1/0/1 for the text being less/equal/greater.
+    private static func stringNumberOrdering(
+        _ text: String, _ number: Double, _ numberText: String
+    ) -> Int {
+        let trimmed = String(
+            text.drop(while: { $0 == " " || $0 == "\t" })
+                .reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
+        if let parsed = Double(trimmed) {
+            if parsed < number { return -1 }
+            return parsed > number ? 1 : 0
+        }
+        if text.caseInsensitiveLessThan(numberText) { return -1 }
+        return text.caseInsensitiveEquals(numberText) ? 0 : 1
     }
 
     // MARK: - Relational Operators (LingoValue returning)
@@ -278,7 +354,7 @@ public enum LingoValue {
     }
 
     public static func > (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
-        return (!lessThanBool(lhs: lhs, rhs: rhs) && !equalsBool(lhs: lhs, rhs: rhs)) ? .integer(1) : .integer(0)
+        return greaterThanBool(lhs: lhs, rhs: rhs) ? .integer(1) : .integer(0)
     }
 
     public static func <= (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
@@ -286,7 +362,7 @@ public enum LingoValue {
     }
 
     public static func >= (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
-        return !lessThanBool(lhs: lhs, rhs: rhs) ? .integer(1) : .integer(0)
+        return (greaterThanBool(lhs: lhs, rhs: rhs) || equalsBool(lhs: lhs, rhs: rhs)) ? .integer(1) : .integer(0)
     }
 
     // MARK: - Arithmetic Operators
