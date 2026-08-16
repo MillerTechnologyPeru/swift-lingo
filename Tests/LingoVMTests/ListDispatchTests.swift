@@ -1,3 +1,4 @@
+import LingoBytecode
 import LingoRuntime
 import Testing
 
@@ -68,4 +69,60 @@ struct ReturnCallTests {
             Issue.record("expected VOID from a global `return` dispatch")
         }
     }
+}
+
+/// `t.line.count` and `t.line[n]` compile to `objCall` `count`/`getProp`
+/// with the STRING as receiver and the chunk type as a symbol — the
+/// spelling `parseParams`-style config parsers are built from.
+@Suite("Lingo VM String Chunk Collections")
+struct StringChunkCollectionDispatchTests {
+
+    private func run(
+        _ build: (LingoAssembler) throws -> Void
+    ) throws -> LingoValue {
+        let assembler = LingoAssembler()
+        try build(assembler)
+        let (handler, names, literals) = try assembler.build()
+        let chunk = ScriptChunk(
+            scriptNumber: 1, literals: literals, handlers: [handler], propertyNameIDs: [],
+            propertyDefaults: [:])
+        return try LingoVM.call(
+            handler: handler, chunk: chunk, names: names, environment: LingoEnvironment(),
+            version: 500)
+    }
+
+    @Test func countOfLinesOnAString() throws {
+        // "a\rb\rc".line.count
+        let result = try run { asm in
+            asm.pushString("a\rb\rc").pushSymbol("line").pushArgList(2).objCall("count").ret()
+        }
+        #expect(result.asInteger() == 3)
+    }
+
+    @Test func indexingALineOnAString() throws {
+        // "a\rb\rc".line[2]
+        let result = try run { asm in
+            asm.pushString("a\rb\rc").pushSymbol("line").pushInt(2)
+            asm.pushArgList(3).objCall("getProp").ret()
+        }
+        #expect(result.asString() == "b")
+    }
+
+    @Test func rangedCharsOnAString() throws {
+        // "[info]".char[2..5]
+        let result = try run { asm in
+            asm.pushString("[info]").pushSymbol("char").pushInt(2).pushInt(5)
+            asm.pushArgList(4).objCall("getProp").ret()
+        }
+        #expect(result.asString() == "info")
+    }
+
+    @Test func lengthAsAPropertyOnAString() throws {
+        // "hello".length — getObjProp on a string value.
+        let result = try run { asm in
+            asm.pushString("hello").getObjProp("length").ret()
+        }
+        #expect(result.asInteger() == 5)
+    }
+
 }
