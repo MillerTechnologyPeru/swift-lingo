@@ -215,3 +215,42 @@ struct GeneratedFreshnessTests {
         #expect(fresh == committed, "regenerate Generated/differential.swift with swiftlingoc")
     }
 }
+
+/// The comparison semantics that once mattered in production: `repeat while
+/// n > 0` with `n` VOID span forever when `>` was derived as "not less and
+/// not equal". Both paths must agree the guard is false immediately — and
+/// still loop correctly for real numbers.
+extension DifferentialTests {
+
+    @Test func drainAgreesIncludingOnVoid() throws {
+        let environment = LingoEnvironment()
+        let transpiled = Differential(environment: environment)
+
+        for n in [LingoValue.void, .integer(0), .integer(3), .integer(-2)] {
+            let swiftResult = transpiled.callMethod("drain", args: [n])
+            // on drain me, n
+            //   hits = 0
+            //   repeat while n > 0
+            //     n = n - 1
+            //     hits = hits + 1
+            //   end repeat
+            //   return hits
+            let vmResult = try interpret(
+                arguments: ["me", "n"], locals: ["hits"], args: [.void, n],
+                environment: environment
+            ) { asm in
+                asm.pushInt(0).set("hits")
+                asm.repeatWhile {
+                    asm.get("n").pushInt(0).gt()
+                } body: {
+                    asm.get("n").pushInt(1).sub().set("n")
+                    asm.get("hits").pushInt(1).add().set("hits")
+                }
+                asm.get("hits").ret()
+            }
+            #expect(agree(swiftResult, vmResult), "drain(\(n))")
+        }
+        #expect(transpiled.callMethod("drain", args: [.void]).asInteger() == 0)
+        #expect(transpiled.callMethod("drain", args: [.integer(3)]).asInteger() == 3)
+    }
+}
