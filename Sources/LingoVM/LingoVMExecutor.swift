@@ -576,6 +576,13 @@ final class LingoVMExecutor {
                 object.getProperty(propName).setElement(index: args[2], value: args[3])
                 return .void
             }
+            // `glob.PLAYER[#play_manager] = v` — a two-level set whose root
+            // is itself a property list: fetch the inner collection (a
+            // reference), then set into it.
+            if args[0].isList {
+                args[0][args[1]].setElement(index: args[2], value: args[3])
+                return .void
+            }
         case ("setProp", 5):
             if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
                 let current = object.getProperty(propName)
