@@ -98,10 +98,9 @@ import LingoRuntime
         names: ["vmTestDeleteChunkGlobal"], environment: environment)
     let result = try executor.run()
 
-    // settingChunk replaces the word with "", leaving the space separators
-    // either side — matches what LingoRuntime's own chunk-join actually
-    // produces, not an idealized "clean delete".
-    #expect(LingoValue.equalsBool(lhs: result, rhs: .string("one  three")))
+    // A real delete, not put-EMPTY-into: the word's trailing whitespace run
+    // goes with it, so the neighbors close ranks with a single space.
+    #expect(LingoValue.equalsBool(lhs: result, rhs: .string("one three")))
 }
 
 @Test func hiliteChunkDelegatesToHostWithTheFieldAndRange() throws {
