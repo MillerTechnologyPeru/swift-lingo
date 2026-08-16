@@ -234,6 +234,13 @@ public final class LingoAssembler {
         return emit(.setGlobal, Int64(internName(name)))
     }
 
+    // MARK: - String joins
+
+    /// Lingo `&`.
+    @discardableResult public func joinStr() -> Self { emit(.joinStr) }
+    /// Lingo `&&` (single space between).
+    @discardableResult public func joinPadStr() -> Self { emit(.joinPadStr) }
+
     // MARK: - Arithmetic / comparison / logic
 
     @discardableResult public func add() -> Self { emit(.add) }
