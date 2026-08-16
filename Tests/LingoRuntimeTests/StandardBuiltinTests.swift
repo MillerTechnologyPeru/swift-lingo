@@ -109,3 +109,44 @@ struct StandardBuiltinTests {
         #expect(call("count", .list([.integer(1)])).asInteger() == 99)
     }
 }
+
+@Suite("String Builtins")
+struct StringBuiltinTests {
+
+    private let environment = LingoEnvironment()
+
+    private func call(_ name: String, _ args: LingoValue...) -> LingoValue {
+        environment.callGlobal(name, args: args)
+    }
+
+    /// `repeat while offset(numToChar(10), t) > 0` is the pattern that
+    /// makes these load-bearing: the junkbot config manager strips line
+    /// feeds with exactly that loop, and with `offset` unregistered the
+    /// VOID result kept the loop from ever terminating.
+    @Test func offsetFindsSubstringsOneBased() {
+        #expect(call("offset", .string("b"), .string("abc")).asInteger() == 2)
+        #expect(call("offset", .string("abc"), .string("abc")).asInteger() == 1)
+        #expect(call("offset", .string("z"), .string("abc")).asInteger() == 0)
+        #expect(call("offset", .string(""), .string("abc")).asInteger() == 0)
+        #expect(call("offset", .string("B"), .string("abc")).asInteger() == 2)
+    }
+
+    @Test func numToCharAndBackRoundTrip() {
+        #expect(call("numToChar", .integer(65)).asString() == "A")
+        #expect(call("numToChar", .integer(13)).asString() == "\r")
+        #expect(call("charToNum", .string("A")).asInteger() == 65)
+        #expect(call("charToNum", .string("")).asInteger() == 0)
+    }
+
+    @Test func lengthCountsCharacters() {
+        #expect(call("length", .string("abc")).asInteger() == 3)
+        #expect(call("length", .string("")).asInteger() == 0)
+        #expect(call("length", .integer(5)).asInteger() == 0)
+    }
+
+    @Test func charsSlicesInclusively() {
+        #expect(call("chars", .string("abcdef"), .integer(2), .integer(4)).asString() == "bcd")
+        #expect(call("chars", .string("abc"), .integer(2), .integer(99)).asString() == "bc")
+        #expect(call("chars", .string("abc"), .integer(3), .integer(1)).asString() == "")
+    }
+}
