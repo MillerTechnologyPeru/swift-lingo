@@ -197,9 +197,16 @@ struct LingoValueEqualityTests {
         #expect(LingoValue.equalsBool(lhs: a, rhs: b))
     }
 
-    @Test func mismatchedTypesNotEqual() {
-        #expect(!LingoValue.equalsBool(lhs: .integer(1), rhs: .string("1")))
-        #expect(!LingoValue.equalsBool(lhs: .void, rhs: .integer(0)))
+    @Test func mismatchedTypesCoerceLikeDirector() {
+        // Lingo's `=` coerces across types: a numeric string equals the
+        // number it spells, and VOID equals 0 — so `if n = 0` guards fire
+        // for a never-set `n`. Verified against dirplayer-rs's
+        // `datum_equals`. Genuinely incomparable pairs stay unequal.
+        #expect(LingoValue.equalsBool(lhs: .integer(1), rhs: .string("1")))
+        #expect(LingoValue.equalsBool(lhs: .void, rhs: .integer(0)))
+        #expect(!LingoValue.equalsBool(lhs: .integer(1), rhs: .string("one")))
+        #expect(!LingoValue.equalsBool(lhs: .void, rhs: .integer(3)))
+        #expect(!LingoValue.equalsBool(lhs: .void, rhs: .string("")))
     }
 }
 
