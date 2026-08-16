@@ -303,6 +303,16 @@ final class LingoVMExecutor {
         case .extCall:
             let name = getName(obj)
             let argList = try pop()
+            // `return expr` compiles to a named call rather than an opcode:
+            // the value is pushed as this call's single argument, and the
+            // `Ret` that follows expects the handler to have finished
+            // already. Dispatching it as an ordinary global would answer
+            // VOID and leave `Ret` to pop that instead — every `return
+            // expr` in the movie would evaluate to VOID.
+            if name.caseInsensitiveEquals("return") {
+                returnValue = argList.asSequence().first ?? .void
+                return .stop
+            }
             push(environment.callGlobal(name, args: argList.asSequence()))
 
         case .tellCall:
