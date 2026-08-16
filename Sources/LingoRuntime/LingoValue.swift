@@ -56,12 +56,20 @@ public enum LingoValue {
                 if case .void = prop {} else { return prop }
                 return .boundMethod(obj, member)
             }
-            // For now, property lookups on lists/strings are ignored or return void
+            // Dot syntax on a property list reads a key: `glob.player` and
+            // `glob.getaProp(#player)` are the same lookup in Lingo, and it
+            // is how scripts normally reach into a property list.
+            if case .propertyListType = self {
+                return listGetAProp(.symbol(member))
+            }
+            // Lookups on linear lists and strings stay ignored.
             return .void
         }
         nonmutating set {
             if case .object(let obj) = self {
                 obj.setProperty(member, value: newValue)
+            } else if case .propertyListType = self {
+                listSetAProp(.symbol(member), newValue)
             }
         }
     }
