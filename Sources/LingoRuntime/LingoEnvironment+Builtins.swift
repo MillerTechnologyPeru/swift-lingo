@@ -141,6 +141,58 @@ extension LingoEnvironment {
             return .void
         }
 
+        // MARK: Strings
+        //
+        // `offset` in particular guards `repeat while` loops all over real
+        // movies (`repeat while offset(numToChar(10), t) > 0`), so a VOID
+        // stand-in changes loop behavior rather than failing visibly.
+
+        registerGlobalFunction("length") { args in
+            guard case .string(let text)? = args.first else { return .integer(0) }
+            return .integer(text.count)
+        }
+        registerGlobalFunction("offset") { args in
+            // offset(needle, haystack) — 1-based, 0 when absent,
+            // case-insensitive like the rest of Lingo's string handling.
+            guard args.count >= 2 else { return .integer(0) }
+            let needle = args[0].asString().asciiLowercased()
+            let haystack = args[1].asString().asciiLowercased()
+            guard !needle.isEmpty, !haystack.isEmpty else { return .integer(0) }
+            let needleChars = Array(needle)
+            let haystackChars = Array(haystack)
+            guard needleChars.count <= haystackChars.count else { return .integer(0) }
+            for start in 0...(haystackChars.count - needleChars.count) {
+                var matches = true
+                for i in 0..<needleChars.count where haystackChars[start + i] != needleChars[i] {
+                    matches = false
+                    break
+                }
+                if matches { return .integer(start + 1) }
+            }
+            return .integer(0)
+        }
+        registerGlobalFunction("chars") { args in
+            // chars(string, first, last) — inclusive 1-based slice.
+            guard args.count >= 3, case .string(let text) = args[0],
+                let first = args[1].asInteger(), let last = args[2].asInteger()
+            else { return .string("") }
+            let characters = Array(text)
+            let lower = Swift.max(1, first)
+            let upper = Swift.min(characters.count, last)
+            guard lower <= upper else { return .string("") }
+            return .string(String(characters[(lower - 1)..<upper]))
+        }
+        registerGlobalFunction("numToChar") { args in
+            guard let code = args.first?.asInteger(), let scalar = Unicode.Scalar(UInt32(bitPattern: Int32(truncatingIfNeeded: code)) & 0xFF)
+            else { return .string("") }
+            return .string(String(Character(scalar)))
+        }
+        registerGlobalFunction("charToNum") { args in
+            guard case .string(let text)? = args.first, let first = text.unicodeScalars.first
+            else { return .integer(0) }
+            return .integer(Int(first.value))
+        }
+
         // MARK: Arithmetic
 
         registerGlobalFunction("abs") { args in
