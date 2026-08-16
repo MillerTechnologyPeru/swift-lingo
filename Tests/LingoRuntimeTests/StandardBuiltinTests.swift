@@ -150,3 +150,32 @@ struct StringBuiltinTests {
         #expect(call("chars", .string("abc"), .integer(3), .integer(1)).asString() == "")
     }
 }
+
+/// The builtins are plain Swift functions too — hosts and other builtins
+/// call them without going through name dispatch.
+@Suite("Direct Builtin Calls")
+struct DirectBuiltinCallTests {
+
+    @Test func builtinsAreCallableWithoutAnEnvironment() {
+        #expect(LingoBuiltins.count(.list([.integer(1), .integer(2)])).asInteger() == 2)
+        #expect(LingoBuiltins.voidP(.void).asInteger() == 1)
+        #expect(LingoBuiltins.offset(.string("b"), .string("abc")).asInteger() == 2)
+        #expect(LingoBuiltins.numToChar(.integer(65)).asString() == "A")
+        #expect(LingoBuiltins.ilk(.list([])).asString() == "list")
+        #expect(LingoBuiltins.ilk(.list([]), .symbol("list")).asInteger() == 1)
+        #expect(
+            LingoBuiltins.chars(.string("abcdef"), .integer(2), .integer(4)).asString() == "bcd")
+        #expect(LingoBuiltins.max([.integer(2), .integer(9), .integer(5)]).asInteger() == 9)
+    }
+
+    /// The registered spellings and the Swift functions are the same code:
+    /// answers agree by construction.
+    @Test func registeredNamesDelegateToTheSwiftFunctions() {
+        let environment = LingoEnvironment()
+        let viaName = environment.callGlobal(
+            "offset", args: [.string("wörld"), .string("héllo wörld")])
+        let direct = LingoBuiltins.offset(.string("wörld"), .string("héllo wörld"))
+        #expect(LingoValue.equalsBool(lhs: viaName, rhs: direct))
+        #expect(direct.asInteger() == 7)
+    }
+}
