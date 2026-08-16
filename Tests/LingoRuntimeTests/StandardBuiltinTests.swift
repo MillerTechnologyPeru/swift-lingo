@@ -179,3 +179,46 @@ struct DirectBuiltinCallTests {
         #expect(direct.asInteger() == 7)
     }
 }
+
+/// The numeric-or-keep-string idiom real parsers rely on:
+/// `v = float(v)` then `if integer(v) = v then v = integer(v)` leaves
+/// numeric strings as numbers and everything else as the original string.
+@Suite("Coercion Semantics")
+struct CoercionSemanticsTests {
+
+    @Test func floatKeepsNonNumericStringsUnchanged() {
+        #expect(LingoBuiltins.float(.string("demo")).asString() == "demo")
+        if case .string = LingoBuiltins.float(.string("demo")) {} else {
+            Issue.record("float of a non-numeric string must stay a string")
+        }
+        if case .float(let d) = LingoBuiltins.float(.string(" 3.5 ")) {
+            #expect(d == 3.5)
+        } else {
+            Issue.record("float should parse numeric strings")
+        }
+    }
+
+    @Test func integerRoundsAndParsesOrIsVoid() {
+        #expect(LingoBuiltins.integer(.float(3.7)).asInteger() == 4)
+        #expect(LingoBuiltins.integer(.float(-2.5)).asInteger() == -3)  // half away from zero, like the reference
+        #expect(LingoBuiltins.integer(.string("42")).asInteger() == 42)
+        if case .void = LingoBuiltins.integer(.string("demo")) {} else {
+            Issue.record("integer of a non-numeric string must be VOID")
+        }
+    }
+
+    @Test func theNumericOrKeepStringIdiomWorks() {
+        for (input, expectNumeric) in [("3", true), ("0", true), ("demo", false), ("35;21", false)] {
+            var value = LingoBuiltins.float(.string(input))
+            let asInt = LingoBuiltins.integer(value)
+            if LingoValue.equalsBool(lhs: asInt, rhs: value) {
+                value = asInt
+            }
+            if expectNumeric {
+                if case .integer = value {} else { Issue.record("\(input) should become a number") }
+            } else {
+                #expect(value.asString() == input, "\(input) should stay itself")
+            }
+        }
+    }
+}
