@@ -348,48 +348,8 @@ public enum LingoValue {
 
     // MARK: - Utilities
 
-    public func chunk(_ type: String, start: LingoValue, end: LingoValue?) -> LingoValue {
-        guard case .string(let string) = self, let startIndex = start.asInteger() else { return .void }
-        let endIndex = end?.asInteger() ?? startIndex
-        let chunks = splitIntoChunks(string, type: type)
-        let lowerBound = Swift.max(1, startIndex)
-        let upperBound = Swift.min(chunks.count, endIndex)
-        if lowerBound > upperBound || lowerBound > chunks.count { return .string("") }
-        return .string(chunks[(lowerBound - 1)..<upperBound].joined(separator: chunkJoiner(for: type)))
-    }
-
-    public func lastChunk(_ type: String) -> LingoValue {
-        guard case .string(let string) = self else { return .void }
-        return .string(splitIntoChunks(string, type: type).last ?? "")
-    }
-
-    public func settingChunk(_ type: String, start: LingoValue, end: LingoValue?, value: LingoValue) -> LingoValue {
-        let string = self.asString()
-        let startIdx = start.asInteger() ?? 1
-        let lowerBound = Swift.max(1, startIdx)
-        let endIndex = end?.asInteger() ?? startIdx
-
-        var chunks = splitIntoChunks(string, type: type)
-        let upperBound = Swift.max(lowerBound, endIndex)
-
-        if lowerBound > chunks.count {
-            while chunks.count < lowerBound - 1 {
-                chunks.append("")
-            }
-            chunks.append(value.asString())
-        } else {
-            let actualUpper = Swift.min(chunks.count, upperBound)
-            let range = (lowerBound - 1)..<actualUpper
-            chunks.replaceSubrange(range, with: [value.asString()])
-        }
-
-        return .string(chunks.joined(separator: chunkJoiner(for: type)))
-    }
-
-    public func chunkCount(_ type: String) -> LingoValue {
-        guard case .string(let string) = self else { return .integer(0) }
-        return .integer(splitIntoChunks(string, type: type).count)
-    }
+    // String chunk expressions (char/word/item/line) live in
+    // LingoValue+Chunks.swift.
 
     public func asInteger() -> Int? {
         switch self {
@@ -421,25 +381,6 @@ public enum LingoValue {
     /// Lingo `&&` operator: concatenates the string forms with a single space between them.
     public func concatSpace(_ other: LingoValue) -> LingoValue {
         return .string(self.asString() + " " + other.asString())
-    }
-
-    private func splitIntoChunks(_ string: String, type: String) -> [String] {
-        switch type.asciiLowercased() {
-        case "char": return string.map { String($0) }
-        case "word": return string.split { $0 == " " || $0 == "\n" || $0 == "\t" }.map(String.init)
-        case "item": return string.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
-        case "line", "paragraph": return string.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        default: return [string]
-        }
-    }
-
-    private func chunkJoiner(for type: String) -> String {
-        switch type.asciiLowercased() {
-        case "word": return " "
-        case "item": return ","
-        case "line", "paragraph": return "\n"
-        default: return ""
-        }
     }
 
     /// Checks if a string or list contains the given value.
