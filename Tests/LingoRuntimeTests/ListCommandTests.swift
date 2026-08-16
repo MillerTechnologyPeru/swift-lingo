@@ -79,7 +79,8 @@ struct ListCommandTests {
 
     @Test func getLastAnswersVoidWhenEmpty() {
         #expect(LingoValue.list([.integer(1), .integer(2)]).listGetLast().asInteger() == 2)
-        if case .void = LingoValue.list([]).listGetLast() {} else {
+        if case .void = LingoValue.list([]).listGetLast() {
+        } else {
             Issue.record("expected VOID from an empty list")
         }
     }
@@ -121,7 +122,8 @@ struct ListCommandTests {
 
     @Test func getAPropAnswersVoidForAMissingKey() {
         let list = LingoValue.propertyList([(key: .symbol("a"), value: .integer(1))])
-        if case .void = list.listGetAProp(.symbol("zzz")) {} else {
+        if case .void = list.listGetAProp(.symbol("zzz")) {
+        } else {
             Issue.record("expected VOID for a missing key")
         }
     }
@@ -129,10 +131,11 @@ struct ListCommandTests {
     @Test func getPropAtAnswersTheKey() {
         let list = LingoValue.propertyList([
             (key: .symbol("a"), value: .integer(1)),
-            (key: .symbol("b"), value: .integer(2)),
+            (key: .symbol("b"), value: .integer(2))
         ])
         #expect(list.listGetPropAt(.integer(2)).asString() == "b")
-        if case .void = list.listGetPropAt(.integer(9)) {} else {
+        if case .void = list.listGetPropAt(.integer(9)) {
+        } else {
             Issue.record("expected VOID past the end")
         }
     }
@@ -140,7 +143,8 @@ struct ListCommandTests {
     @Test func findPosAnswersVoidWhenAbsent() {
         let list = LingoValue.propertyList([(key: .symbol("a"), value: .integer(1))])
         #expect(list.listFindPos(.symbol("a")).asInteger() == 1)
-        if case .void = list.listFindPos(.symbol("q")) {} else {
+        if case .void = list.listFindPos(.symbol("q")) {
+        } else {
             Issue.record("expected VOID for a missing key")
         }
     }
@@ -148,7 +152,7 @@ struct ListCommandTests {
     @Test func deletePropRemovesByKey() {
         let list = LingoValue.propertyList([
             (key: .symbol("a"), value: .integer(1)),
-            (key: .symbol("b"), value: .integer(2)),
+            (key: .symbol("b"), value: .integer(2))
         ])
         list.listDeleteProp(.symbol("a"))
         #expect(keys(list) == ["b"])
@@ -158,7 +162,7 @@ struct ListCommandTests {
     @Test func deleteOneOnAPropertyListMatchesValues() {
         let list = LingoValue.propertyList([
             (key: .symbol("a"), value: .integer(1)),
-            (key: .symbol("b"), value: .integer(2)),
+            (key: .symbol("b"), value: .integer(2))
         ])
         list.listDeleteOne(.integer(2))
         #expect(keys(list) == ["a"])
@@ -205,7 +209,7 @@ struct PropertyListMemberTests {
     @Test func countStaysAnIntrinsic() {
         let list = LingoValue.propertyList([
             (key: .symbol("a"), value: .integer(1)),
-            (key: .symbol("b"), value: .integer(2)),
+            (key: .symbol("b"), value: .integer(2))
         ])
         #expect(list.count.asInteger() == 2)
     }

@@ -44,7 +44,8 @@ struct StandardBuiltinTests {
     }
 
     @Test func listFunctionsIgnoreNonLists() {
-        if case .void = call("getAt", .integer(3), .integer(1)) {} else {
+        if case .void = call("getAt", .integer(3), .integer(1)) {
+        } else {
             Issue.record("expected VOID for a non-list receiver")
         }
     }
@@ -88,7 +89,8 @@ struct StandardBuiltinTests {
         } else {
             Issue.record("expected a float")
         }
-        if case .void = call("value", .string("nonsense")) {} else {
+        if case .void = call("value", .string("nonsense")) {
+        } else {
             Issue.record("expected VOID for unparseable text")
         }
     }

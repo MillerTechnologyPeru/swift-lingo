@@ -63,7 +63,8 @@ struct ReturnCallTests {
         let environment = LingoEnvironment()
         // Nothing registers `return`, so a global dispatch answers VOID —
         // which is exactly why it needs handling inside the executor.
-        if case .void = environment.callGlobal("return", args: [.integer(7)]) {} else {
+        if case .void = environment.callGlobal("return", args: [.integer(7)]) {
+        } else {
             Issue.record("expected VOID from a global `return` dispatch")
         }
     }
