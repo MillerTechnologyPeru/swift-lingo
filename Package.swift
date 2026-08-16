@@ -117,6 +117,14 @@ let package = Package(
             swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
         ),
         .testTarget(
+            name: "LingoDifferentialTests",
+            dependencies: [
+                "LingoVM", "LingoBytecode", "LingoRuntime", "LingoParser", "LingoTranspiler",
+                .product(name: "BinaryParsing", package: "swift-binary-parsing")
+            ],
+            swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]
+        ),
+        .testTarget(
             name: "LingoVMTests",
             dependencies: [
                 "LingoVM", "LingoBytecode", "LingoRuntime",
