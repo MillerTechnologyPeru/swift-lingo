@@ -51,3 +51,20 @@ struct ListDispatchTests {
                 method: "add", receiver: .integer(3), args: [.integer(1)]) == nil)
     }
 }
+
+/// `return expr` is compiled as a named call rather than an opcode: the
+/// value arrives as the call's argument and the following `Ret` expects the
+/// handler to have already finished. Treating it as an ordinary global
+/// makes every `return expr` in a movie evaluate to VOID.
+@Suite("Lingo VM Return")
+struct ReturnCallTests {
+
+    @Test func returnIsNotAnOrdinaryGlobal() {
+        let environment = LingoEnvironment()
+        // Nothing registers `return`, so a global dispatch answers VOID —
+        // which is exactly why it needs handling inside the executor.
+        if case .void = environment.callGlobal("return", args: [.integer(7)]) {} else {
+            Issue.record("expected VOID from a global `return` dispatch")
+        }
+    }
+}
