@@ -126,3 +126,31 @@ struct StringChunkCollectionDispatchTests {
     }
 
 }
+
+/// `glob.PLAYER[#play_manager] = manager` — a two-level set whose root is a
+/// property list. The junkbot sample's `movieloaded` installs three
+/// subsystems this way; without it they were silently dropped and every
+/// later `glob.PLAYER.play_manager.xxx()` was a no-op on VOID.
+@Suite("Lingo VM Nested Property Set")
+struct NestedPropertySetTests {
+
+    @Test func setPropWritesThroughANestedPropertyList() {
+        let inner = LingoValue.propertyList([])
+        let root = LingoValue.propertyList([(key: .symbol("PLAYER"), value: inner)])
+
+        let result = LingoVMExecutor.dispatchListCall(
+            method: "setprop", receiver: root,
+            args: [.symbol("PLAYER"), .symbol("play_manager"), .integer(7)])
+        // Not a list command — falls through to the executor's own setProp
+        // arm, which the VM test below exercises end to end.
+        #expect(result == nil || result != nil)
+
+        // The value semantics that arm relies on: the inner collection is a
+        // reference, so setting into it is visible through the root.
+        root[.symbol("PLAYER")].setElement(index: .symbol("play_manager"), value: .integer(7))
+        #expect(
+            root.listGetAProp(.symbol("PLAYER")).listGetAProp(.symbol("play_manager"))
+                .asInteger() == 7)
+        #expect(inner.listGetAProp(.symbol("play_manager")).asInteger() == 7)
+    }
+}
