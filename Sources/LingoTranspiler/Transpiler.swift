@@ -12,7 +12,7 @@ public final class LingoTranspiler {
         "count", "voidp", "ilk", "listp", "stringp", "symbolp", "objectp",
         "integerp", "floatp", "string", "symbol", "integer", "float", "value",
         "length", "offset", "chars", "numtochar", "chartonum",
-        "abs", "max", "min",
+        "abs", "max", "min"
     ]
 
     /// Optional logger. When set, the transpiler calls this with diagnostic messages.
