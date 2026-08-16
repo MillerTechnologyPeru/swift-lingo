@@ -339,8 +339,16 @@ final class LingoVMExecutor {
 
         case .getObjProp, .getChainedProp:
             let object = try pop()
+            let name = getName(obj)
             if case .object(let target) = object {
-                push(target.getProperty(getName(obj)))
+                push(target.getProperty(name))
+            } else if case .propertyListType = object {
+                // `glob.download_manager` — dot syntax on a property list is
+                // a key lookup, and a chain like `glob.player.manager` is
+                // just this repeated.
+                push(object.listGetAProp(.symbol(name)))
+            } else if name.caseInsensitiveEquals("count") {
+                push(object.count)
             } else {
                 push(.void)
             }
@@ -348,8 +356,11 @@ final class LingoVMExecutor {
         case .setObjProp:
             let value = try pop()
             let object = try pop()
+            let name = getName(obj)
             if case .object(let target) = object {
-                target.setProperty(getName(obj), value: value)
+                target.setProperty(name, value: value)
+            } else if case .propertyListType = object {
+                object.listSetAProp(.symbol(name), value)
             }
 
         case .get:
@@ -612,6 +623,13 @@ final class LingoVMExecutor {
         case "setat":
             receiver.setElement(index: argument(0), value: argument(1))
         default:
+            // Anything else aimed at a property list is a key read —
+            // `glob.download_manager` reaches the VM as a no-argument call
+            // named after the key. Linear lists have no such spelling, so
+            // they fall through to ordinary dispatch.
+            if case .propertyListType = receiver, args.isEmpty {
+                return receiver.listGetAProp(.symbol(method))
+            }
             return nil
         }
         return .void
