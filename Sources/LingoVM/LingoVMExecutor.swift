@@ -456,11 +456,12 @@ final class LingoVMExecutor {
             let target = try readVarTarget(varType: obj)
             let range = try popChunkRangeSelector()
             if let target, let range {
+                // Deleting is not putting EMPTY into the chunk: it takes an
+                // adjoining separator with it so the neighbors close ranks.
                 let current = readVariable(target)
                 writeVariable(
                     target,
-                    value: current.settingChunk(
-                        range.type, start: range.first, end: range.last, value: .string("")))
+                    value: current.deletingChunk(range.type, start: range.first, end: range.last))
             }
 
         case .hiliteChunk:
