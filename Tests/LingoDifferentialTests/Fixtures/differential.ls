@@ -33,3 +33,12 @@ end
 on firstOffset me, needle, hay
   return offset(needle, hay)
 end
+
+on drain me, n
+  hits = 0
+  repeat while n > 0
+    n = n - 1
+    hits = hits + 1
+  end repeat
+  return hits
+end
