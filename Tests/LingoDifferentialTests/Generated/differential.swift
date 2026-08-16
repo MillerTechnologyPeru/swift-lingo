@@ -44,6 +44,7 @@ public class Differential: LingoObject {
         case `sumto` = "sumto"
         case `describe` = "describe"
         case `firstoffset` = "firstoffset"
+        case `drain` = "drain"
     }
 
     public override func callMethod(_ name: String, args: [LingoValue]) -> LingoValue {
@@ -61,6 +62,8 @@ public class Differential: LingoObject {
             return self.`describe`(args.count > 0 ? args[0] : .void, args.count > 1 ? args[1] : .void)
         case .`firstoffset`:
             return self.`firstOffset`(args.count > 0 ? args[0] : .void, args.count > 1 ? args[1] : .void)
+        case .`drain`:
+            return self.`drain`(args.count > 0 ? args[0] : .void)
         }
     }
 
@@ -140,6 +143,28 @@ public class Differential: LingoObject {
 
         // return offset(needle, hay)
         return self.`offset`(`needle`, `hay`)
+    }
+
+    public func `drain`(_ `n`: LingoValue = LingoValue.void) -> LingoValue {
+        var `hits`: LingoValue = .void
+        _ = `hits`
+        var `n`: LingoValue = `n`
+        _ = `n`
+
+        // hits = 0
+        `hits` = LingoValue.integer(0)
+        // repeat while (n > 0)
+        //   n = (n - 1)
+        //   hits = (hits + 1)
+        // end repeat
+        while ((`n` > LingoValue.integer(0)) as LingoValue).asBool() {
+            // n = (n - 1)
+            `n` = (`n` - LingoValue.integer(1))
+            // hits = (hits + 1)
+            `hits` = (`hits` + LingoValue.integer(1))
+        }
+        // return hits
+        return `hits`
     }
 
 }
