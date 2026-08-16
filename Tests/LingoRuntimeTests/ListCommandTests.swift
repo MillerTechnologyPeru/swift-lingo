@@ -171,3 +171,47 @@ struct ListCommandTests {
         #expect(notAList.listGetPos(.integer(1)).asInteger() == 0)
     }
 }
+
+@Suite("Property List Dot Access")
+struct PropertyListMemberTests {
+
+    /// `glob.download_manager` and `glob.getaProp(#download_manager)` are the
+    /// same lookup — dot syntax is how scripts normally read a property list.
+    @Test func dotAccessReadsAKey() {
+        let list = LingoValue.propertyList([(key: .symbol("player"), value: .integer(7))])
+        #expect(list.player.asInteger() == 7)
+    }
+
+    @Test func dotAccessAnswersVoidForAMissingKey() {
+        let list = LingoValue.propertyList([])
+        if case .void = list.missing {} else { Issue.record("expected VOID") }
+    }
+
+    @Test func dotAssignmentSetsAKey() {
+        let list = LingoValue.propertyList([])
+        list.player = .integer(9)
+        #expect(list.listGetAProp(.symbol("player")).asInteger() == 9)
+    }
+
+    @Test func dotAssignmentReplacesRatherThanDuplicating() {
+        let list = LingoValue.propertyList([(key: .symbol("a"), value: .integer(1))])
+        list.a = .integer(2)
+        guard case .propertyListType(let raw) = list else { return }
+        #expect(raw.elements.count == 1)
+        #expect(list.a.asInteger() == 2)
+    }
+
+    /// `count` keeps its own meaning rather than being read as a key.
+    @Test func countStaysAnIntrinsic() {
+        let list = LingoValue.propertyList([
+            (key: .symbol("a"), value: .integer(1)),
+            (key: .symbol("b"), value: .integer(2)),
+        ])
+        #expect(list.count.asInteger() == 2)
+    }
+
+    @Test func linearListsIgnoreDotAccess() {
+        let list = LingoValue.list([.integer(1)])
+        if case .void = list.anything {} else { Issue.record("expected VOID from a linear list") }
+    }
+}
