@@ -359,6 +359,9 @@ final class LingoVMExecutor {
                 push(object.listGetAProp(.symbol(name)))
             } else if name.caseInsensitiveEquals("count") {
                 push(object.count)
+            } else if case .string(let text) = object, name.caseInsensitiveEquals("length") {
+                // `L.length` — string length as a property.
+                push(.integer(text.count))
             } else {
                 push(.void)
             }
@@ -544,10 +547,29 @@ final class LingoVMExecutor {
             if case .symbol(let propName) = args[1], case .object(let object) = args[0] {
                 return object.getProperty(propName).count
             }
+            // `t.line.count` — a chunk-collection count on a string.
+            if case .string = args[0], case .symbol(let chunkType) = args[1],
+                Self.isChunkType(chunkType)
+            {
+                return args[0].chunkCount(chunkType)
+            }
         case ("getProp", 3), ("getProp", 4), ("getPropRef", 3), ("getPropRef", 4):
             if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
                 let value = object.getProperty(propName)
                 return nargs == 4 ? value.getRange(start: args[2], end: args[3]) : value[args[2]]
+            }
+            // `t.line[n]` and `t.char[a..b]` — chunk-collection indexing on
+            // a string resolves to the chunk expression itself.
+            if case .string = args[0], case .symbol(let chunkType) = args[1],
+                Self.isChunkType(chunkType)
+            {
+                return args[0].chunk(
+                    chunkType, start: args[2], end: nargs == 4 ? args[3] : nil)
+            }
+            // `getProp(plist, #key)` — the raising sibling of `getaProp`;
+            // answered forgivingly here, like the rest of this dispatch.
+            if args[0].isList, nargs == 3 {
+                return args[0].listGetAProp(args[1])
             }
         case ("setProp", 4):
             if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
@@ -598,6 +620,13 @@ final class LingoVMExecutor {
 
         guard let first = args.first, case .object(let target) = first else { return .void }
         return target.callMethod(method, args: Array(args.dropFirst()))
+    }
+
+    /// The four string chunk collections (`char`/`word`/`item`/`line`).
+    static func isChunkType(_ name: String) -> Bool {
+        name.caseInsensitiveEquals("char") || name.caseInsensitiveEquals("word")
+            || name.caseInsensitiveEquals("item") || name.caseInsensitiveEquals("line")
+            || name.caseInsensitiveEquals("paragraph")
     }
 
     /// Routes Lingo's list commands to their `LingoValue` implementations.
