@@ -565,8 +565,56 @@ final class LingoVMExecutor {
             break
         }
 
+        // List commands arrive here as ordinary method calls on a list
+        // receiver, which is neither an object nor one of the shapes above.
+        if let receiver = args.first,
+            let result = Self.dispatchListCall(
+                method: method, receiver: receiver, args: Array(args.dropFirst()))
+        {
+            return result
+        }
+
         guard let first = args.first, case .object(let target) = first else { return .void }
         return target.callMethod(method, args: Array(args.dropFirst()))
+    }
+
+    /// Routes Lingo's list commands to their `LingoValue` implementations.
+    ///
+    /// Returns `nil` when `method` isn't a list command or `receiver` isn't a
+    /// list, so the caller can fall through to ordinary object dispatch —
+    /// an object is free to define its own `add`, and that has to keep
+    /// working.
+    static func dispatchListCall(
+        method: String, receiver: LingoValue, args: [LingoValue]
+    ) -> LingoValue? {
+        guard receiver.isList else { return nil }
+        func argument(_ index: Int) -> LingoValue { index < args.count ? args[index] : .void }
+
+        switch method.asciiLowercased() {
+        case "add": receiver.listAdd(argument(0))
+        case "append": receiver.listAppend(argument(0))
+        case "addat": receiver.listAddAt(argument(0), argument(1))
+        case "deleteat": receiver.listDeleteAt(argument(0))
+        case "deleteone": receiver.listDeleteOne(argument(0))
+        case "deleteprop": receiver.listDeleteProp(argument(0))
+        case "addprop": receiver.listAddProp(argument(0), argument(1))
+        case "setaprop": receiver.listSetAProp(argument(0), argument(1))
+        case "sort": receiver.listSort()
+        case "getpos": return receiver.listGetPos(argument(0))
+        case "getone": return receiver.listGetOne(argument(0))
+        case "getlast": return receiver.listGetLast()
+        case "getaprop": return receiver.listGetAProp(argument(0))
+        case "getpropat": return receiver.listGetPropAt(argument(0))
+        case "findpos": return receiver.listFindPos(argument(0))
+        case "duplicate": return receiver.listDuplicate()
+        case "count": return receiver.count
+        case "getat": return receiver[argument(0)]
+        case "setat":
+            receiver.setElement(index: argument(0), value: argument(1))
+        default:
+            return nil
+        }
+        return .void
     }
 
     // MARK: - Director 4 numbered properties (`Get`/`Set`)
