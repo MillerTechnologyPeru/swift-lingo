@@ -4,6 +4,17 @@ import LingoParser
 
 public final class LingoTranspiler {
 
+    /// The language-level functions `LingoObject` exposes as instance
+    /// methods (see LingoRuntime's `LingoBuiltins` /
+    /// `LingoObject+Builtins`). Kept in sync by
+    /// `LingoDifferentialTests`, which exercises both paths.
+    static let standardBuiltinNames: Set<String> = [
+        "count", "voidp", "ilk", "listp", "stringp", "symbolp", "objectp",
+        "integerp", "floatp", "string", "symbol", "integer", "float", "value",
+        "length", "offset", "chars", "numtochar", "chartonum",
+        "abs", "max", "min",
+    ]
+
     /// Optional logger. When set, the transpiler calls this with diagnostic messages.
     public var log: ((String) -> Void)?
     public var maxDepth: UInt = 500
@@ -572,11 +583,21 @@ public final class LingoTranspiler {
             let tStr = await transpile(expression: target, locals: locals, isMethod: isMethod, depth: depth + 1)
             return "\(tStr).`\(prop)`"
         case .functionCall(let target, let name, let args):
-            let lingoArgs = args.filter { !$0.isMeReference }
+            // In a call to a user handler, a `me` argument names the
+            // receiver and travels as `self` — so it's stripped from the
+            // argument list. In a call to one of the language's builtins,
+            // `me` is a REAL argument (`string(me)` stringifies the
+            // object), so it must survive, as the value form of self.
+            let isBuiltin = Self.standardBuiltinNames.contains(name.lowercased())
+            let lingoArgs = (isBuiltin && isMethod) ? args : args.filter { !$0.isMeReference }
             var argStr = ""
             for (i, arg) in lingoArgs.enumerated() {
                 if i > 0 { argStr += ", " }
-                argStr += await transpile(expression: arg, locals: locals, isMethod: isMethod, depth: depth + 1)
+                if arg.isMeReference {
+                    argStr += "LingoValue.object(self)"
+                } else {
+                    argStr += await transpile(expression: arg, locals: locals, isMethod: isMethod, depth: depth + 1)
+                }
             }
             if let t = target {
                 let tStr = t.isMeReference ? "self" : await transpile(expression: t, locals: locals, isMethod: isMethod, depth: depth + 1)
