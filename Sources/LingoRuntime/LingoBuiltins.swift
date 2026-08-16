@@ -75,19 +75,42 @@ public enum LingoBuiltins {
         .symbol(value.asString())
     }
 
+    /// `integer(x)` — floats round, numeric strings parse, and anything
+    /// unconvertible is VOID. The rounding and the VOID both matter:
+    /// `parseParams`-style code does `if integer(v) = v` to decide whether
+    /// a parsed value was numeric.
     public static func integer(_ value: LingoValue) -> LingoValue {
-        guard let integer = value.asInteger() else { return .void }
-        return .integer(integer)
+        switch value {
+        case .integer: return value
+        case .float(let double): return .integer(Int(double.rounded()))
+        case .string(let text):
+            let trimmed = trimmedSpaces(text)
+            if let integer = Int(trimmed) { return .integer(integer) }
+            if let double = Double(trimmed) { return .integer(Int(double.rounded())) }
+            return .void
+        default: return .void
+        }
     }
 
+    /// `float(x)` — numbers become floats; a string becomes the number it
+    /// spells, and a NON-numeric string comes back UNCHANGED (Director's
+    /// behavior, and what the numeric-or-keep-string idiom relies on:
+    /// `v = float(v)` followed by `if integer(v) = v`).
     public static func float(_ value: LingoValue) -> LingoValue {
         switch value {
-        case .float(let double): return .float(double)
+        case .float: return value
         case .integer(let integer): return .float(Double(integer))
-        default:
-            guard let integer = value.asInteger() else { return .void }
-            return .float(Double(integer))
+        case .string(let text):
+            guard let double = Double(trimmedSpaces(text)) else { return value }
+            return .float(double)
+        default: return value
         }
+    }
+
+    private static func trimmedSpaces(_ text: String) -> String {
+        String(
+            text.drop(while: { $0 == " " || $0 == "\t" })
+                .reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
     }
 
     /// `value("42")` — parses a number out of a string; non-strings pass
