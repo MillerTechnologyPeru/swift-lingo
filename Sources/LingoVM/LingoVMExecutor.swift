@@ -32,6 +32,17 @@ final class LingoVMExecutor {
     /// `StartTell` pushed).
     var tellStack: [LingoObject?] = []
 
+    /// Argument lists built by `PushArgListNoRet` — the compiler's mark for
+    /// a call made as a statement, whose result nothing consumes. A call
+    /// fed one of these leaves nothing on the stack. Pushing anyway would
+    /// silently grow the stack by one per statement call, which is fatal
+    /// inside `repeat with x in list`: that loop keeps its list, count and
+    /// counter on the stack and reaches them by `Peek` depth, so a stray
+    /// value between them and the top means `add 1` bumps the stray, not
+    /// the counter, and the loop never ends. Keyed by list identity because
+    /// the arg list is a reference and identity is all a call sees.
+    var noReturnArgLists: Set<ObjectIdentifier> = []
+
     init(
         handler: HandlerDef,
         chunk: ScriptChunk,
@@ -119,7 +130,9 @@ final class LingoVMExecutor {
             push(.list(try popArguments(count: Int(obj))))
 
         case .pushArgListNoRet:
-            push(.list(try popArguments(count: Int(obj))))
+            let list = LingoValue.list(try popArguments(count: Int(obj)))
+            if case .listType(let raw) = list { noReturnArgLists.insert(ObjectIdentifier(raw)) }
+            push(list)
 
         case .peek:
             let depthFromTop = Int(obj)
@@ -298,7 +311,7 @@ final class LingoVMExecutor {
                 handler: targetHandler, chunk: chunk, names: names, args: argList.asSequence(),
                 receiver: receiver, host: host, environment: environment, version: version,
                 multiplier: multiplier, depth: depth + 1)
-            push(result)
+            pushResult(result, of: argList)
 
         case .extCall:
             let name = getName(obj)
@@ -313,7 +326,7 @@ final class LingoVMExecutor {
                 returnValue = argList.asSequence().first ?? .void
                 return .stop
             }
-            push(environment.callGlobal(name, args: argList.asSequence()))
+            pushResult(environment.callGlobal(name, args: argList.asSequence()), of: argList)
 
         case .tellCall:
             // Inside a `tell` block, a message send redirects to the
@@ -325,20 +338,20 @@ final class LingoVMExecutor {
             let name = getName(obj)
             let argList = try pop()
             if let target = tellStack.last, let target {
-                push(target.callMethod(name, args: argList.asSequence()))
+                pushResult(target.callMethod(name, args: argList.asSequence()), of: argList)
             } else {
-                push(environment.callGlobal(name, args: argList.asSequence()))
+                pushResult(environment.callGlobal(name, args: argList.asSequence()), of: argList)
             }
 
         case .objCallV4:
             let argList = try pop()
             let object = try readVar(varType: obj)
-            push(object.dynamicallyCall(withArguments: argList.asSequence()))
+            pushResult(object.dynamicallyCall(withArguments: argList.asSequence()), of: argList)
 
         case .objCall:
             let method = getName(obj)
             let argList = try pop()
-            push(dispatchObjCall(method: method, argList: argList))
+            pushResult(dispatchObjCall(method: method, argList: argList), of: argList)
 
         case .getMovieProp:
             push(host?.movie.getProperty(getName(obj)) ?? .void)
@@ -887,6 +900,17 @@ final class LingoVMExecutor {
 
     /// Pops `count` values in reverse push order, restoring left-to-right
     /// argument order (the last-pushed argument is popped first).
+    /// Pushes a call's result unless its argument list was built by
+    /// `PushArgListNoRet` — a statement call, whose result is dropped.
+    private func pushResult(_ result: LingoValue, of argList: LingoValue) {
+        if case .listType(let raw) = argList,
+            noReturnArgLists.remove(ObjectIdentifier(raw)) != nil
+        {
+            return
+        }
+        push(result)
+    }
+
     private func popArguments(count: Int) throws -> [LingoValue] {
         var args: [LingoValue] = []
         args.reserveCapacity(count)
