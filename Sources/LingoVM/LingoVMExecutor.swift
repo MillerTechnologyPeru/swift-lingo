@@ -566,10 +566,12 @@ final class LingoVMExecutor {
                 return args[0].chunk(
                     chunkType, start: args[2], end: nargs == 4 ? args[3] : nil)
             }
-            // `getProp(plist, #key)` — the raising sibling of `getaProp`;
-            // answered forgivingly here, like the rest of this dispatch.
+            // `plist.key[n]` / `plist.key[a..b]` with a property list at the
+            // root — the download manager's
+            // `displaysprites.loading_msg[1].member.text = ...`. The key
+            // selects the inner list; the rest indexes into it.
             if args[0].isList, nargs == 3 {
-                return args[0].listGetAProp(args[1])
+                return args[0].listGetAProp(args[1])[args[2]]
             }
         case ("setProp", 4):
             if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
