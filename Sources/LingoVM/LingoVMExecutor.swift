@@ -43,6 +43,17 @@ final class LingoVMExecutor {
     /// the arg list is a reference and identity is all a call sees.
     var noReturnArgLists: Set<ObjectIdentifier> = []
 
+    /// `the itemDelimiter` in effect — a movie property scripts reset at
+    /// will (`the itemDelimiter = ";"`) to split their own data formats,
+    /// which every `item` chunk expression here has to honor. Comma when the
+    /// movie hasn't set one, or when there is no movie.
+    var itemDelimiter: Character {
+        guard let value = host?.movie.getProperty("itemDelimiter"), case .string(let text) = value,
+            let first = text.first
+        else { return "," }
+        return first
+    }
+
     init(
         handler: HandlerDef,
         chunk: ScriptChunk,
@@ -423,7 +434,7 @@ final class LingoVMExecutor {
         case .getChunk:
             let string = try pop()
             if let range = try popChunkRangeSelector() {
-                push(string.chunk(range.type, start: range.first, end: range.last))
+                push(string.chunk(range.type, start: range.first, end: range.last, itemDelimiter: itemDelimiter))
             } else {
                 push(string)
             }
@@ -458,7 +469,8 @@ final class LingoVMExecutor {
             let value = try pop()
             if let target, let range {
                 let current = readVariable(target)
-                let existingChunk = current.chunk(range.type, start: range.first, end: range.last)
+                let existingChunk = current.chunk(
+                    range.type, start: range.first, end: range.last, itemDelimiter: itemDelimiter)
                 let newChunkContent: LingoValue
                 switch (obj >> 4) & 0xF {
                 case 2: newChunkContent = existingChunk.concat(value)  // after
@@ -468,7 +480,8 @@ final class LingoVMExecutor {
                 writeVariable(
                     target,
                     value: current.settingChunk(
-                        range.type, start: range.first, end: range.last, value: newChunkContent))
+                        range.type, start: range.first, end: range.last, value: newChunkContent,
+                        itemDelimiter: itemDelimiter))
             }
 
         case .deleteChunk:
@@ -480,7 +493,8 @@ final class LingoVMExecutor {
                 let current = readVariable(target)
                 writeVariable(
                     target,
-                    value: current.deletingChunk(range.type, start: range.first, end: range.last))
+                    value: current.deletingChunk(
+                        range.type, start: range.first, end: range.last, itemDelimiter: itemDelimiter))
             }
 
         case .hiliteChunk:
@@ -567,7 +581,7 @@ final class LingoVMExecutor {
             if case .string = args[0], case .symbol(let chunkType) = args[1],
                 Self.isChunkType(chunkType)
             {
-                return args[0].chunkCount(chunkType)
+                return args[0].chunkCount(chunkType, itemDelimiter: itemDelimiter)
             }
         case ("getProp", 3), ("getProp", 4), ("getPropRef", 3), ("getPropRef", 4):
             if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
@@ -580,7 +594,8 @@ final class LingoVMExecutor {
                 Self.isChunkType(chunkType)
             {
                 return args[0].chunk(
-                    chunkType, start: args[2], end: nargs == 4 ? args[3] : nil)
+                    chunkType, start: args[2], end: nargs == 4 ? args[3] : nil,
+                    itemDelimiter: itemDelimiter)
             }
             // `plist.key[n]` / `plist.key[a..b]` with a property list at the
             // root — the download manager's
@@ -753,11 +768,11 @@ final class LingoVMExecutor {
                 return host?.movie.getProperty(PropertyNames.movieProperty(propertyID)) ?? .void
             }
             let string = try pop()
-            return string.lastChunk(chunkTypeName(propertyID - 0x0b))
+            return string.lastChunk(chunkTypeName(propertyID - 0x0b), itemDelimiter: itemDelimiter)
 
         case 0x01:
             let string = try pop()
-            return string.chunkCount(chunkTypeName(propertyID))
+            return string.chunkCount(chunkTypeName(propertyID), itemDelimiter: itemDelimiter)
 
         case 0x02:
             let menuId = try pop()
@@ -801,7 +816,8 @@ final class LingoVMExecutor {
             let propValue = member.getProperty(propName)
             if propertyType == 0x0a || propertyType == 0x0c || propertyType == 0x15 {
                 if let range = try popChunkRangeSelector() {
-                    return propValue.chunk(range.type, start: range.first, end: range.last)
+                    return propValue.chunk(
+                        range.type, start: range.first, end: range.last, itemDelimiter: itemDelimiter)
                 }
             }
             return propValue
@@ -862,7 +878,8 @@ final class LingoVMExecutor {
                 let range = try popChunkRangeSelector()
             {
                 let updated = member.getProperty(propName).settingChunk(
-                    range.type, start: range.first, end: range.last, value: value)
+                    range.type, start: range.first, end: range.last, value: value,
+                    itemDelimiter: itemDelimiter)
                 member.setProperty(propName, value: updated)
             } else {
                 member.setProperty(propName, value: value)
