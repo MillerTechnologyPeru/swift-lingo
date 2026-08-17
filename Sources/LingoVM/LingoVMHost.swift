@@ -16,6 +16,9 @@ public protocol LingoVMHost: AnyObject {
     var movie: LingoObject { get }
     func sprite(_ channel: LingoValue) -> LingoObject?
     func member(_ id: LingoValue, castLib: LingoValue?) -> LingoObject?
+    /// The cast library `id` names (a number or a name), for `castLib(...)`
+    /// and `the number of castMembers of castLib ...`.
+    func castLibrary(_ id: LingoValue) -> LingoObject?
     func menu(_ id: LingoValue) -> LingoObject?
     func sound(_ id: LingoValue) -> LingoObject?
     func window(_ id: LingoValue) -> LingoObject?
@@ -32,6 +35,7 @@ public protocol LingoVMHost: AnyObject {
 extension LingoVMHost {
     public func sprite(_ channel: LingoValue) -> LingoObject? { nil }
     public func member(_ id: LingoValue, castLib: LingoValue?) -> LingoObject? { nil }
+    public func castLibrary(_ id: LingoValue) -> LingoObject? { nil }
     public func menu(_ id: LingoValue) -> LingoObject? { nil }
     public func sound(_ id: LingoValue) -> LingoObject? { nil }
     public func window(_ id: LingoValue) -> LingoObject? { nil }
