@@ -104,7 +104,7 @@ private func be32(_ value: UInt32) -> [UInt8] {
     #expect(handler.bytecodeArray.map(\.pos) == [0, 2, 4, 5])
 }
 
-@Test func scriptChunkMapsPropertyDefaultsFromLiterals() throws {
+@Test func scriptChunkLeavesPropertiesWithoutDefaults() throws {
     // Same layout as above, but with one property whose default comes from
     // the (only) literal, and zero handlers.
     let literalsOffset: UInt32 = 92
@@ -151,6 +151,10 @@ private func be32(_ value: UInt32) -> [UInt8] {
 
     #expect(chunk.scriptNumber == 9)
     #expect(chunk.propertyNameIDs == [20])
-    #expect(chunk.propertyDefaults == [20: .int(5)])
+    // The literal pool has nothing to do with the property list: a
+    // property starts VOID, no matter what literal happens to share its
+    // index.
+    #expect(chunk.propertyDefaults.isEmpty)
+    #expect(chunk.literals == [.int(5)])
     #expect(chunk.handlers.isEmpty)
 }
