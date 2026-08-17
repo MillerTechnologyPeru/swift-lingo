@@ -82,6 +82,24 @@ struct StandardBuiltinTests {
 
     // MARK: Coercions and arithmetic
 
+    @Test func pointAndRectAreListsWithNamedComponents() {
+        let p = call("point", .integer(3), .integer(4))
+        #expect(p.count.asInteger() == 2)
+        #expect(p[.integer(1)].asInteger() == 3)
+        #expect(LingoBuiltins.geometryProperty(of: p, named: "locV")?.asInteger() == 4)
+
+        let r = call("rect", .integer(10), .integer(20), .integer(110), .integer(70))
+        #expect(LingoBuiltins.geometryProperty(of: r, named: "right")?.asInteger() == 110)
+        #expect(LingoBuiltins.geometryProperty(of: r, named: "width")?.asInteger() == 100)
+        #expect(LingoBuiltins.geometryProperty(of: r, named: "height")?.asInteger() == 50)
+        let r2 = call("rect", p, call("point", .integer(13), .integer(24)))
+        #expect(LingoBuiltins.geometryProperty(of: r2, named: "width")?.asInteger() == 10)
+        #expect(LingoBuiltins.geometryProperty(of: r2, named: "bottom")?.asInteger() == 24)
+        // Not a component of a two-element list, and never of a non-list.
+        #expect(LingoBuiltins.geometryProperty(of: p, named: "left") == nil)
+        #expect(LingoBuiltins.geometryProperty(of: .integer(1), named: "locH") == nil)
+    }
+
     @Test func valueReadsListLiterals() {
         let list = call("value", .string("[1, \"two\", #three]"))
         #expect(list.count.asInteger() == 3)
