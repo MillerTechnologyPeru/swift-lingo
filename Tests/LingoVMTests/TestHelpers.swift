@@ -80,6 +80,7 @@ final class TestHost: LingoVMHost {
     var sprites: [Int: LingoObject] = [:]
     var members: [Int: LingoObject] = [:]
     var windows: [Int: LingoObject] = [:]
+    var castLibraries: [String: LingoObject] = [:]
     var intersects = false
     var within = false
     var lastHilite: (member: LingoObject, type: String, first: LingoValue, last: LingoValue)?
@@ -93,6 +94,10 @@ final class TestHost: LingoVMHost {
     func sprite(_ channel: LingoValue) -> LingoObject? {
         guard let index = channel.asInteger() else { return nil }
         return sprites[index]
+    }
+
+    func castLibrary(_ id: LingoValue) -> LingoObject? {
+        castLibraries[id.asString().lowercased()]
     }
 
     func window(_ id: LingoValue) -> LingoObject? {
