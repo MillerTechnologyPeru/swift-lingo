@@ -192,3 +192,29 @@ struct PropertyListSubIndexTests {
         #expect(result.asInteger() == 20)
     }
 }
+
+/// `plist.count` is the number of entries, even though every other dotted
+/// name on a property list is a key lookup — the junkbot legoparts manager
+/// sizes its piece table with `repeat with t = 1 to piecedata.count`, and
+/// a key lookup answered VOID and skipped the whole loop.
+@Suite("Lingo VM Property-List Count")
+struct PropertyListCountTests {
+
+    @Test func dottedCountOnAPropertyListIsItsSize() throws {
+        let environment = LingoEnvironment()
+        environment.setGlobal(
+            "table",
+            .propertyList([
+                (key: .symbol("a"), value: .integer(1)), (key: .symbol("b"), value: .integer(2)),
+            ]))
+        let assembler = LingoAssembler()
+        assembler.get("table").getObjProp("count").ret()
+        let (handler, names, literals) = try assembler.build()
+        let chunk = ScriptChunk(
+            scriptNumber: 1, literals: literals, handlers: [handler], propertyNameIDs: [],
+            propertyDefaults: [:])
+        let result = try LingoVM.call(
+            handler: handler, chunk: chunk, names: names, environment: environment, version: 500)
+        #expect(result.asInteger() == 2)
+    }
+}
