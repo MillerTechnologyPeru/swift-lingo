@@ -5,6 +5,9 @@ public struct ScriptChunk: Equatable, Sendable {
     public var literals: [LiteralValue]
     public var handlers: [HandlerDef]
     public var propertyNameIDs: [UInt16]
+    /// Initial values for properties by name id. Always empty for scripts
+    /// read from a file — Director scripts start every property VOID —
+    /// but kept so hand-built chunks (tests, tools) can seed properties.
     public var propertyDefaults: [UInt16: LiteralValue]
 
     public init(
@@ -117,19 +120,17 @@ public struct ScriptChunk: Equatable, Sendable {
                 }
             }
 
-            var propertyDefaults: [UInt16: LiteralValue] = [:]
-            for (index, propertyNameID) in propertyNameIDs.enumerated() where index < literals.count {
-                if propertyDefaults[propertyNameID] == nil {
-                    propertyDefaults[propertyNameID] = literals[index]
-                }
-            }
-
+            // Script properties have no stored initial values — every
+            // property of a fresh instance is VOID until a handler assigns
+            // it. (An earlier reading paired property i with literal i, which
+            // seeded junk: a `levelList` that wasn't VOID sent the junkbot
+            // game manager down its "level list" branch and no level loaded.)
             return ScriptChunk(
                 scriptNumber: scriptNumber,
                 literals: literals,
                 handlers: handlers,
                 propertyNameIDs: propertyNameIDs,
-                propertyDefaults: propertyDefaults
+                propertyDefaults: [:]
             )
         }
     }
