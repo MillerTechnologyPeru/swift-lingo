@@ -627,3 +627,37 @@ struct LingoValueCollectionTests {
         #expect(list.count.asInteger() == 2)
     }
 }
+
+/// Lingo arithmetic on lists is element-wise, which is what makes
+/// `part.pos + sh[i]` (two `[h, v]` points) place a brick's cells; a
+/// scalar spreads across every element.
+@Suite("LingoValue List Arithmetic")
+struct LingoValueListArithmeticTests {
+
+    @Test func listsAddSubtractElementWise() {
+        let a = LingoValue.list([.integer(1), .integer(2)])
+        let b = LingoValue.list([.integer(10), .integer(20)])
+        let sum = a + b
+        #expect(sum[.integer(1)].asInteger() == 11)
+        #expect(sum[.integer(2)].asInteger() == 22)
+        let diff = b - a
+        #expect(diff[.integer(1)].asInteger() == 9)
+        #expect(diff[.integer(2)].asInteger() == 18)
+    }
+
+    @Test func mismatchedLengthsUseTheShorter() {
+        let a = LingoValue.list([.integer(1), .integer(2), .integer(3)])
+        let b = LingoValue.list([.integer(1), .integer(1)])
+        #expect((a + b).count.asInteger() == 2)
+    }
+
+    @Test func scalarsSpreadAcrossEveryElement() {
+        let a = LingoValue.list([.integer(2), .integer(3)])
+        let doubled = a * .integer(2)
+        #expect(doubled[.integer(1)].asInteger() == 4)
+        #expect(doubled[.integer(2)].asInteger() == 6)
+        let halved = .integer(12) / a
+        #expect(halved[.integer(1)].asInteger() == 6)
+        #expect(halved[.integer(2)].asInteger() == 4)
+    }
+}
