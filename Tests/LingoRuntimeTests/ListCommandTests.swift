@@ -37,6 +37,18 @@ struct ListCommandTests {
         if case .void = raw.elements[1] {} else { Issue.record("expected VOID padding") }
     }
 
+    @Test func setAtPastTheEndGrowsTheListWithZeros() {
+        // `playfield[i][22] = 0` on a fresh row builds a 22-slot column.
+        let row = LingoValue.list([])
+        row.setElement(index: .integer(3), value: .integer(7))
+        #expect(integers(row) == [0, 0, 7])
+        row.setElement(index: .integer(1), value: .integer(1))
+        #expect(integers(row) == [1, 0, 7])
+        // Positions below 1 are ignored.
+        row.setElement(index: .integer(0), value: .integer(9))
+        #expect(integers(row) == [1, 0, 7])
+    }
+
     @Test func deleteAtRemovesByPosition() {
         let list = LingoValue.list([.integer(1), .integer(2), .integer(3)])
         list.listDeleteAt(.integer(2))
