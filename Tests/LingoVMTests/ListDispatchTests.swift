@@ -154,3 +154,41 @@ struct NestedPropertySetTests {
         #expect(inner.listGetAProp(.symbol("play_manager")).asInteger() == 7)
     }
 }
+
+/// `displaysprites.loading_msg[1]` compiles to
+/// `getPropRef(displaysprites, #loading_msg, 1)`: with a property list at
+/// the root, the symbol picks the inner list and the last argument indexes
+/// into it. Answering the whole inner list instead left the sample's
+/// "READY TO PLAY" message unset.
+@Suite("Lingo VM Property-List Sub-Indexing")
+struct PropertyListSubIndexTests {
+
+    private func run(
+        _ environment: LingoEnvironment, _ build: (LingoAssembler) throws -> Void
+    ) throws -> LingoValue {
+        let assembler = LingoAssembler()
+        try build(assembler)
+        let (handler, names, literals) = try assembler.build()
+        let chunk = ScriptChunk(
+            scriptNumber: 1, literals: literals, handlers: [handler], propertyNameIDs: [],
+            propertyDefaults: [:])
+        return try LingoVM.call(
+            handler: handler, chunk: chunk, names: names, environment: environment, version: 500)
+    }
+
+    private func environment() -> LingoEnvironment {
+        let environment = LingoEnvironment()
+        let inner = LingoValue.list([.integer(10), .integer(20), .integer(30)])
+        environment.setGlobal(
+            "displaysprites", .propertyList([(key: .symbol("loading_msg"), value: inner)]))
+        return environment
+    }
+
+    @Test func getPropRefIndexesIntoTheKeyedList() throws {
+        let result = try run(environment()) { asm in
+            asm.get("displaysprites").pushSymbol("loading_msg").pushInt(2)
+            asm.pushArgList(3).objCall("getPropRef").ret()
+        }
+        #expect(result.asInteger() == 20)
+    }
+}
