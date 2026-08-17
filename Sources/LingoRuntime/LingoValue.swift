@@ -124,10 +124,15 @@ public enum LingoValue {
     public func setElement(index: LingoValue, value: LingoValue) {
         switch self {
         case .listType(let arr):
-            if case .integer(let idx) = index {
-                if idx >= 1 && idx <= arr.elements.count {
-                    arr.elements[idx - 1] = value
+            // Setting past the end grows the list, padding with 0 — how a
+            // Lingo grid gets built (`playfield[i][height] = 0` on an empty
+            // row). Positions below 1 are ignored, as Director ignores them.
+            if case .integer(let idx) = index, idx >= 1 {
+                if idx > arr.elements.count {
+                    arr.elements.append(
+                        contentsOf: repeatElement(.integer(0), count: idx - arr.elements.count))
                 }
+                arr.elements[idx - 1] = value
             }
         case .propertyListType(let props):
             if case .integer(let idx) = index {
