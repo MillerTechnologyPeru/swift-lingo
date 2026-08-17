@@ -82,6 +82,31 @@ struct StandardBuiltinTests {
 
     // MARK: Coercions and arithmetic
 
+    @Test func valueReadsListLiterals() {
+        let list = call("value", .string("[1, \"two\", #three]"))
+        #expect(list.count.asInteger() == 3)
+        #expect(list[.integer(2)].asString() == "two")
+        #expect(list[.integer(3)].asString() == "three")
+
+        // The shape a behavior initializer takes in the score.
+        let plist = call("value", .string("[#mylocz: 5, #label: \"a, b\"]"))
+        #expect(plist.listGetAProp(.symbol("mylocz")).asInteger() == 5)
+        #expect(plist.listGetAProp(.symbol("label")).asString() == "a, b")
+
+        let nested = call("value", .string("[#loc: [10, -20], #empty: [:], #none: []]"))
+        #expect(nested.listGetAProp(.symbol("loc"))[.integer(2)].asInteger() == -20)
+        #expect(nested.listGetAProp(.symbol("empty")).count.asInteger() == 0)
+        #expect(nested.listGetAProp(.symbol("none")).count.asInteger() == 0)
+
+        // Not literals: an expression, trailing junk, a bare word.
+        for text in ["1 + 2", "[1, 2] x", "hello", "[#a: 1, 2]"] {
+            if case .void = call("value", .string(text)) {
+            } else {
+                Issue.record("expected VOID for \(text)")
+            }
+        }
+    }
+
     @Test func valueParsesNumbersOutOfStrings() {
         #expect(call("value", .string(" 42 ")).asInteger() == 42)
         if case .float(let d) = call("value", .string("1.5")) {
