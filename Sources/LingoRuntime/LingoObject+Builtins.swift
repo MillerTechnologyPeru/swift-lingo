@@ -37,6 +37,13 @@ extension LingoObject {
     public func chars(_ text: LingoValue, _ first: LingoValue, _ last: LingoValue) -> LingoValue {
         LingoBuiltins.chars(text, first, last)
     }
+    public func point(_ h: LingoValue, _ v: LingoValue) -> LingoValue { LingoBuiltins.point(h, v) }
+    public func rect(
+        _ left: LingoValue, _ top: LingoValue, _ right: LingoValue, _ bottom: LingoValue
+    ) -> LingoValue { LingoBuiltins.rect(left, top, right, bottom) }
+    public func rect(_ topLeft: LingoValue, _ bottomRight: LingoValue) -> LingoValue {
+        LingoBuiltins.rect(topLeft, bottomRight)
+    }
     public func numToChar(_ code: LingoValue) -> LingoValue { LingoBuiltins.numToChar(code) }
     public func charToNum(_ text: LingoValue) -> LingoValue { LingoBuiltins.charToNum(text) }
 
