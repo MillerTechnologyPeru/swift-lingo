@@ -43,6 +43,35 @@ import LingoRuntime
     #expect(LingoValue.equalsBool(lhs: result, rhs: .string("two")))
 }
 
+/// `item 3 of "5;21;3;1"` honors `the itemDelimiter` — a movie property
+/// scripts flip to split their own formats. The junkbot level parser sets
+/// it to ";" for every part record; with a fixed comma every field came
+/// back empty and no brick was ever placed.
+@Test func getChunkItemsSplitOnTheMoviesItemDelimiter() throws {
+    let host = TestHost()
+    host.movieObject.setProperty("itemDelimiter", value: .string(";"))
+    let executor = try makeExecutor(
+        bytes: [
+            0x03, 0x03,  // firstChar=0, lastChar=0
+            0x03, 0x03,  // firstWord=0, lastWord=0
+            0x41, 0x03, 0x41, 0x03,  // firstItem=3, lastItem=3
+            0x03, 0x03,  // firstLine=0, lastLine=0
+            0x44, 0x00,  // PushCons "5;21;3;1"
+            0x17,  // GetChunk
+            0x01,  // Ret
+        ],
+        literals: [.string("5;21;3;1")], host: host)
+    #expect(LingoValue.equalsBool(lhs: try executor.run(), rhs: .string("3")))
+
+    // Without a movie setting, the delimiter is a comma.
+    let plain = try makeExecutor(
+        bytes: [
+            0x03, 0x03, 0x03, 0x03, 0x41, 0x02, 0x41, 0x02, 0x03, 0x03, 0x44, 0x00, 0x17, 0x01,
+        ],
+        literals: [.string("a,b;c")])
+    #expect(LingoValue.equalsBool(lhs: try plain.run(), rhs: .string("b;c")))
+}
+
 @Test func putIntoGlobalWritesBackByName() throws {
     let executor = try makeExecutor(
         bytes: [
