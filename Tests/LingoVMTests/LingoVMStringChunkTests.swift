@@ -202,3 +202,18 @@ import LingoRuntime
 
     #expect(LingoValue.equalsBool(lhs: result, rhs: .integer(0)))
 }
+
+/// `the number of castMembers of castLib "levels"` asks the named library
+/// for its member count — the junkbot level menu is built by looping to
+/// it, and a movie-wide answer (or VOID) leaves the menu empty.
+@Test func numberOfCastMembersOfCastLibAsksTheLibrary() throws {
+    let host = TestHost()
+    let library = TestReceiver(environment: LingoEnvironment())
+    library.setProperty("number of members", value: .integer(60))
+    host.castLibraries["levels"] = library
+    // PushCons "levels"; PushInt8 2; Get 8 (animation2 property 2, castLib on the stack); Ret
+    let executor = try makeExecutor(
+        bytes: [0x44, 0x00, 0x41, 0x02, 0x5c, 0x08, 0x01],
+        literals: [.string("levels")], host: host)
+    #expect(LingoValue.equalsBool(lhs: try executor.run(), rhs: .integer(60)))
+}
