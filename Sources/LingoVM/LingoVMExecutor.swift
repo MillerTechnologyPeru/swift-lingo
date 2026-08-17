@@ -376,6 +376,11 @@ final class LingoVMExecutor {
             let name = getName(obj)
             if case .object(let target) = object {
                 push(target.getProperty(name))
+            } else if name.caseInsensitiveEquals("count"), object.isList {
+                // `list.count` is the element count for linear and property
+                // lists alike — a property list is never asked for a key
+                // named `count` this way (that's `plist[#count]`).
+                push(object.count)
             } else if case .propertyListType = object {
                 // `glob.download_manager` — dot syntax on a property list is
                 // a key lookup, and a chain like `glob.player.manager` is
