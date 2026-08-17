@@ -809,7 +809,13 @@ final class LingoVMExecutor {
         case 0x08:
             let propName = PropertyNames.animation2Property(propertyID)
             if propertyID == 0x02, version >= 500 {
-                _ = try pop()  // castLib id — not distinguished from the movie-wide total
+                // `the number of castMembers of castLib X` — the library's own
+                // member count, when the host knows the library. The junkbot
+                // level menu sizes itself with it (`castLib "levels"` → 60).
+                let castLib = try pop()
+                if let library = host?.castLibrary(castLib) {
+                    return library.getProperty("number of members")
+                }
             }
             return host?.movie.getProperty(propName) ?? .void
 
