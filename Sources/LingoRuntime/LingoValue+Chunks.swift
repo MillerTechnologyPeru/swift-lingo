@@ -132,11 +132,16 @@ extension LingoValue {
         return clampedLower..<clampedUpper
     }
 
-    public func chunk(_ type: String, start: LingoValue, end: LingoValue?) -> LingoValue {
+    /// The `itemDelimiter` parameters below are `the itemDelimiter` in
+    /// effect for the call — a movie-wide setting scripts change freely
+    /// (`the itemDelimiter = ";"`) to pick apart their own data formats.
+    public func chunk(
+        _ type: String, start: LingoValue, end: LingoValue?, itemDelimiter: Character = ","
+    ) -> LingoValue {
         guard case .string(let string) = self, let startIndex = start.asInteger() else {
             return .void
         }
-        let ranges = Self.chunkRanges(of: string, type: type)
+        let ranges = Self.chunkRanges(of: string, type: type, itemDelimiter: itemDelimiter)
         guard
             let selected = Self.hostChunkRange(
                 start: startIndex, end: end?.asInteger() ?? 0, count: ranges.count)
@@ -146,28 +151,30 @@ extension LingoValue {
         return .string(String(string[lower..<upper]))
     }
 
-    public func lastChunk(_ type: String) -> LingoValue {
+    public func lastChunk(_ type: String, itemDelimiter: Character = ",") -> LingoValue {
         guard case .string(let string) = self else { return .void }
-        guard let range = Self.chunkRanges(of: string, type: type).last else {
+        guard let range = Self.chunkRanges(of: string, type: type, itemDelimiter: itemDelimiter).last
+        else {
             return .string("")
         }
         return .string(String(string[range]))
     }
 
-    public func chunkCount(_ type: String) -> LingoValue {
+    public func chunkCount(_ type: String, itemDelimiter: Character = ",") -> LingoValue {
         guard case .string(let string) = self else { return .integer(0) }
-        return .integer(Self.chunkRanges(of: string, type: type).count)
+        return .integer(Self.chunkRanges(of: string, type: type, itemDelimiter: itemDelimiter).count)
     }
 
     /// `put value into chunk` — replaces the selected span in the source,
     /// leaving everything around it untouched. A start past the last chunk
     /// appends, padded with the type's separator.
     public func settingChunk(
-        _ type: String, start: LingoValue, end: LingoValue?, value: LingoValue
+        _ type: String, start: LingoValue, end: LingoValue?, value: LingoValue,
+        itemDelimiter: Character = ","
     ) -> LingoValue {
         let string = self.asString()
         let startIndex = start.asInteger() ?? 1
-        let ranges = Self.chunkRanges(of: string, type: type)
+        let ranges = Self.chunkRanges(of: string, type: type, itemDelimiter: itemDelimiter)
 
         if let selected = Self.hostChunkRange(
             start: startIndex, end: end?.asInteger() ?? 0, count: ranges.count)
@@ -181,7 +188,7 @@ extension LingoValue {
         let separator: String
         switch type.asciiLowercased() {
         case "word": separator = " "
-        case "item": separator = ","
+        case "item": separator = String(itemDelimiter)
         case "line", "paragraph": separator = "\r"
         default: separator = ""
         }
@@ -194,10 +201,12 @@ extension LingoValue {
     /// deleting a word eats the whitespace run after it (or before it, for
     /// the last word), and deleting an item or line takes one adjoining
     /// separator with it, so the remaining chunks close ranks.
-    public func deletingChunk(_ type: String, start: LingoValue, end: LingoValue?) -> LingoValue {
+    public func deletingChunk(
+        _ type: String, start: LingoValue, end: LingoValue?, itemDelimiter: Character = ","
+    ) -> LingoValue {
         let string = self.asString()
         guard let startIndex = start.asInteger() else { return .string(string) }
-        let ranges = Self.chunkRanges(of: string, type: type)
+        let ranges = Self.chunkRanges(of: string, type: type, itemDelimiter: itemDelimiter)
         guard
             let selected = Self.hostChunkRange(
                 start: startIndex, end: end?.asInteger() ?? 0, count: ranges.count)
