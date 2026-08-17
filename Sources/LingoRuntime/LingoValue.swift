@@ -367,15 +367,35 @@ public enum LingoValue {
 
     // MARK: - Arithmetic Operators
 
+    /// Lingo arithmetic is element-wise on lists — `[1, 2] + [3, 4]` is
+    /// `[4, 6]`, over the shorter operand's length — and a scalar spreads
+    /// across every element (`[1, 2] * 2` is `[2, 4]`). This is how points
+    /// and rects add too, which matter here because `point(x, y)` is
+    /// represented as a two-element list; see `LingoBuiltins.point`.
+    private static func elementwise(
+        _ lhs: LingoValue, _ rhs: LingoValue, _ op: (LingoValue, LingoValue) -> LingoValue
+    ) -> LingoValue? {
+        switch (lhs, rhs) {
+        case (.listType(let l), .listType(let r)):
+            let count = Swift.min(l.elements.count, r.elements.count)
+            return .list((0..<count).map { op(l.elements[$0], r.elements[$0]) })
+        case (.listType(let l), .integer), (.listType(let l), .float):
+            return .list(l.elements.map { op($0, rhs) })
+        case (.integer, .listType(let r)), (.float, .listType(let r)):
+            return .list(r.elements.map { op(lhs, $0) })
+        default:
+            return nil
+        }
+    }
+
     public static func + (lhs: LingoValue, rhs: LingoValue) -> LingoValue {
         switch (lhs, rhs) {
         case (.integer(let l), .integer(let r)): return .integer(l + r)
         case (.float(let l), .float(let r)): return .float(l + r)
-        case (.listType(let l), .listType(let r)): return .listType(LingoListClass(l.elements + r.elements))
         case (.integer(let l), .float(let r)): return .float(Double(l) + r)
         case (.float(let l), .integer(let r)): return .float(l + Double(r))
         case (.string(let l), .string(let r)): return .string(l + r)
-        default: return .void
+        default: return elementwise(lhs, rhs, +) ?? .void
         }
     }
 
@@ -385,7 +405,7 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return .float(l - r)
         case (.integer(let l), .float(let r)): return .float(Double(l) - r)
         case (.float(let l), .integer(let r)): return .float(l - Double(r))
-        default: return .void
+        default: return elementwise(lhs, rhs, -) ?? .void
         }
     }
 
@@ -395,7 +415,7 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return .float(l * r)
         case (.integer(let l), .float(let r)): return .float(Double(l) * r)
         case (.float(let l), .integer(let r)): return .float(l * Double(r))
-        default: return .void
+        default: return elementwise(lhs, rhs, *) ?? .void
         }
     }
 
@@ -405,7 +425,7 @@ public enum LingoValue {
         case (.float(let l), .float(let r)): return .float(l / r)
         case (.integer(let l), .float(let r)): return .float(Double(l) / r)
         case (.float(let l), .integer(let r)): return .float(l / Double(r))
-        default: return .void
+        default: return elementwise(lhs, rhs, /) ?? .void
         }
     }
 
