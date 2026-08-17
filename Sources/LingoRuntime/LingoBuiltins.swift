@@ -113,16 +113,13 @@ public enum LingoBuiltins {
                 .reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
     }
 
-    /// `value("42")` — parses a number out of a string; non-strings pass
-    /// through unchanged, unparseable text is VOID.
+    /// `value("[#a: 1, \"b\"]")` — reads a Lingo literal back out of its
+    /// spelling: numbers, strings, symbols, lists, property lists, and the
+    /// `TRUE`/`FALSE`/`VOID`/`EMPTY` constants. Non-strings pass through
+    /// unchanged; text that isn't a literal is VOID.
     public static func value(_ input: LingoValue) -> LingoValue {
         guard case .string(let text) = input else { return input }
-        let trimmed = String(
-            text.drop(while: { $0 == " " || $0 == "\t" })
-                .reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
-        if let integer = Int(trimmed) { return .integer(integer) }
-        if let double = Double(trimmed) { return .float(double) }
-        return .void
+        return LingoLiteralParser.parse(text) ?? .void
     }
 
     // MARK: - Strings
