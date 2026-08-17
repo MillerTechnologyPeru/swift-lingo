@@ -122,6 +122,49 @@ public enum LingoBuiltins {
         return LingoLiteralParser.parse(text) ?? .void
     }
 
+    // MARK: - Geometry
+
+    /// `point(h, v)`. Points are represented as two-element lists — the
+    /// runtime has no separate point type yet — which already gives them
+    /// Lingo's list arithmetic (`point(1, 2) + point(3, 4)`), `[1]`/`[2]`
+    /// indexing, and interoperability with the `[h, v]` lists movies pass
+    /// where a point is expected. `.locH`/`.locV` come from the VM's list
+    /// property access. The cost is `ilk(p)` answering `#list`, not `#point`.
+    public static func point(_ h: LingoValue, _ v: LingoValue) -> LingoValue {
+        .list([h, v])
+    }
+
+    /// `rect(left, top, right, bottom)` — a four-element list, on the same
+    /// terms as `point`.
+    public static func rect(
+        _ left: LingoValue, _ top: LingoValue, _ right: LingoValue, _ bottom: LingoValue
+    ) -> LingoValue {
+        .list([left, top, right, bottom])
+    }
+
+    /// `rect(topLeft, bottomRight)` — the two-point spelling.
+    public static func rect(_ topLeft: LingoValue, _ bottomRight: LingoValue) -> LingoValue {
+        .list([topLeft[.integer(1)], topLeft[.integer(2)], bottomRight[.integer(1)], bottomRight[.integer(2)]])
+    }
+
+    /// The named component of a point or rect held as a list — `p.locH`,
+    /// `r.bottom`, `r.width` — or `nil` when `name` isn't one.
+    public static func geometryProperty(of list: LingoValue, named name: String) -> LingoValue? {
+        guard case .listType(let raw) = list else { return nil }
+        let elements = raw.elements
+        switch (name.asciiLowercased(), elements.count) {
+        case ("loch", 2): return elements[0]
+        case ("locv", 2): return elements[1]
+        case ("left", 4): return elements[0]
+        case ("top", 4): return elements[1]
+        case ("right", 4): return elements[2]
+        case ("bottom", 4): return elements[3]
+        case ("width", 4): return elements[2] - elements[0]
+        case ("height", 4): return elements[3] - elements[1]
+        default: return nil
+        }
+    }
+
     // MARK: - Strings
 
     public static func length(_ value: LingoValue) -> LingoValue {
