@@ -99,6 +99,16 @@ extension LingoEnvironment {
         register1("float", LingoBuiltins.float)
         register1("value", LingoBuiltins.value)
 
+        // MARK: Geometry
+
+        register2("point", LingoBuiltins.point)
+        registerGlobalFunction("rect") { args in
+            if args.count == 2 { return LingoBuiltins.rect(args[0], args[1]) }
+            return LingoBuiltins.rect(
+                args.first ?? .void, args.count > 1 ? args[1] : .void,
+                args.count > 2 ? args[2] : .void, args.count > 3 ? args[3] : .void)
+        }
+
         // MARK: Strings
 
         register1("length", LingoBuiltins.length)
