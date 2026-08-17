@@ -372,6 +372,9 @@ final class LingoVMExecutor {
                 push(object.listGetAProp(.symbol(name)))
             } else if name.caseInsensitiveEquals("count") {
                 push(object.count)
+            } else if let component = LingoBuiltins.geometryProperty(of: object, named: name) {
+                // `p.locH`, `r.bottom` — points and rects are lists here.
+                push(component)
             } else if case .string(let text) = object, name.caseInsensitiveEquals("length") {
                 // `L.length` — string length as a property.
                 push(.integer(text.count))
