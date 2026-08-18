@@ -597,6 +597,14 @@ final class LingoVMExecutor {
             if case .symbol(let propName) = args[1], case .object(let object) = args[0] {
                 return object.getProperty(propName).count
             }
+            // `plist.key.count` — the count of the keyed value, not of the
+            // property list itself (the junkbot game manager checks a level
+            // number against `building.LEVELS.count`; answering 2 for the
+            // building's two keys bounced every level past 2 back to the
+            // menu).
+            if case .symbol = args[1], args[0].isList {
+                return args[0].listGetAProp(args[1]).count
+            }
             // `t.line.count` — a chunk-collection count on a string.
             if case .string = args[0], case .symbol(let chunkType) = args[1],
                 Self.isChunkType(chunkType)
