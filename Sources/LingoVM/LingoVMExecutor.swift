@@ -568,6 +568,11 @@ final class LingoVMExecutor {
     /// `hilite` is still deferred with an explicit no-op — it needs a host
     /// hook carrying position information (which field/range to highlight)
     /// that doesn't exist yet.
+    /// `dispatchObjCall` for tests, which can't reach the private entry.
+    func dispatchObjCallForTesting(method: String, args: [LingoValue]) -> LingoValue {
+        dispatchObjCall(method: method, argList: .list(args))
+    }
+
     private func dispatchObjCall(method: String, argList: LingoValue) -> LingoValue {
         let args = argList.asSequence()
         let nargs = args.count
@@ -579,6 +584,14 @@ final class LingoVMExecutor {
             args[0].setElement(index: args[1], value: args[2])
             return .void
         case ("count", 2):
+            // `member("x").line.count` — a chunk collection on a text
+            // member counts chunks of its text; the junkbot sound code sizes
+            // its playlists that way.
+            if case .object(let object) = args[0], case .symbol(let chunkType) = args[1],
+                Self.isChunkType(chunkType)
+            {
+                return object.getProperty("text").chunkCount(chunkType, itemDelimiter: itemDelimiter)
+            }
             if case .symbol(let propName) = args[1], case .object(let object) = args[0] {
                 return object.getProperty(propName).count
             }
@@ -589,6 +602,14 @@ final class LingoVMExecutor {
                 return args[0].chunkCount(chunkType, itemDelimiter: itemDelimiter)
             }
         case ("getProp", 3), ("getProp", 4), ("getPropRef", 3), ("getPropRef", 4):
+            // `member("x").line[n]` — chunk indexing on a text member.
+            if case .object(let object) = args[0], case .symbol(let chunkType) = args[1],
+                Self.isChunkType(chunkType)
+            {
+                return object.getProperty("text").chunk(
+                    chunkType, start: args[2], end: nargs == 4 ? args[3] : nil,
+                    itemDelimiter: itemDelimiter)
+            }
             if case .object(let object) = args[0], case .symbol(let propName) = args[1] {
                 let value = object.getProperty(propName)
                 return nargs == 4 ? value.getRange(start: args[2], end: args[3]) : value[args[2]]
