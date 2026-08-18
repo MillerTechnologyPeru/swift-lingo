@@ -1,3 +1,4 @@
+import Foundation
 import LingoBytecode
 import LingoRuntime
 
@@ -437,12 +438,14 @@ final class LingoVMExecutor {
             push(a.contains(b))
 
         case .getChunk:
+            // `word 2 of line 1 of t` — every level of the selector applies,
+            // outermost first, each narrowing the text the next one reads.
             let string = try pop()
-            if let range = try popChunkRangeSelector() {
-                push(string.chunk(range.type, start: range.first, end: range.last, itemDelimiter: itemDelimiter))
-            } else {
-                push(string)
+            var value = string
+            for range in try popChunkSelectors() {
+                value = value.chunk(range.type, start: range.first, end: range.last, itemDelimiter: itemDelimiter)
             }
+            push(value)
 
         case .getField:
             let castId: LingoValue? = version >= 500 ? try pop() : nil
@@ -759,7 +762,16 @@ final class LingoVMExecutor {
     /// outermost-first (line, then item, then word, then char), matching the
     /// priority order `LingoBytecode`'s decompiler-side `readChunkRef` uses.
     /// `nil` means no range was specified.
+    /// The outermost level of a chunk selector — for the put/delete forms,
+    /// which act on one level.
     private func popChunkRangeSelector() throws -> (type: String, first: LingoValue, last: LingoValue)? {
+        try popChunkSelectors().first
+    }
+
+    /// Every level of the chunk selector the compiler pushed (char, word,
+    /// item and line ranges; a zero start means "not this level"),
+    /// outermost first — `word 2 of line 1` comes back as line, then word.
+    private func popChunkSelectors() throws -> [(type: String, first: LingoValue, last: LingoValue)] {
         let lastLine = try pop()
         let firstLine = try pop()
         let lastItem = try pop()
@@ -774,11 +786,12 @@ final class LingoVMExecutor {
             return false
         }
 
-        if isNonZero(firstLine) { return ("line", firstLine, lastLine) }
-        if isNonZero(firstItem) { return ("item", firstItem, lastItem) }
-        if isNonZero(firstWord) { return ("word", firstWord, lastWord) }
-        if isNonZero(firstChar) { return ("char", firstChar, lastChar) }
-        return nil
+        var levels: [(type: String, first: LingoValue, last: LingoValue)] = []
+        if isNonZero(firstLine) { levels.append(("line", firstLine, lastLine)) }
+        if isNonZero(firstItem) { levels.append(("item", firstItem, lastItem)) }
+        if isNonZero(firstWord) { levels.append(("word", firstWord, lastWord)) }
+        if isNonZero(firstChar) { levels.append(("char", firstChar, lastChar)) }
+        return levels
     }
 
     /// Director 4's `Get` opcode addresses "the property of object" through
