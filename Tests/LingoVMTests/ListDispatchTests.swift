@@ -184,6 +184,15 @@ struct PropertyListSubIndexTests {
         return environment
     }
 
+    @Test func countOfAKeyedListCountsThatList() throws {
+        // `displaysprites.loading_msg.count` → count(displaysprites, #loading_msg)
+        let result = try run(environment()) { asm in
+            asm.get("displaysprites").pushSymbol("loading_msg")
+            asm.pushArgList(2).objCall("count").ret()
+        }
+        #expect(result.asInteger() == 3)
+    }
+
     @Test func getPropRefIndexesIntoTheKeyedList() throws {
         let result = try run(environment()) { asm in
             asm.get("displaysprites").pushSymbol("loading_msg").pushInt(2)
