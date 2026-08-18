@@ -218,3 +218,26 @@ struct PropertyListCountTests {
         #expect(result.asInteger() == 2)
     }
 }
+
+/// `member("playlist").line.count` and `member("playlist").line[2]` reach
+/// into the member's text — how the junkbot sound code reads its playlist
+/// members. A text-bearing object stands in for the member here.
+@Suite("Lingo VM Member Chunk Collections")
+struct MemberChunkCollectionTests {
+
+    private final class TextObject: LingoObject {
+        override func getProperty(_ name: String) -> LingoValue {
+            name.lowercased() == "text" ? .string("random 2\rintro_1.1\rintro_1.2") : .void
+        }
+    }
+
+    @Test func lineCountAndIndexingReadTheText() {
+        let member = LingoValue.object(TextObject(environment: LingoEnvironment()))
+        let executor = try? makeExecutor(bytes: [0x01])  // a bare Ret; only dispatch is used
+        let count = executor?.dispatchObjCallForTesting(method: "count", args: [member, .symbol("line")])
+        #expect(count?.asInteger() == 3)
+        let second = executor?.dispatchObjCallForTesting(
+            method: "getPropRef", args: [member, .symbol("line"), .integer(2)])
+        #expect(second?.asString() == "intro_1.1")
+    }
+}
