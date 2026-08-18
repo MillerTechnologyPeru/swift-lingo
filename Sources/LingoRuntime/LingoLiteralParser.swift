@@ -122,7 +122,7 @@ struct LingoLiteralParser {
                 sawDigit = true
             } else if byte == UInt8(ascii: "."), !sawDot {
                 sawDot = true
-            } else if (byte == UInt8(ascii: "e") || byte == UInt8(ascii: "E")), sawDigit {
+            } else if byte == UInt8(ascii: "e") || byte == UInt8(ascii: "E"), sawDigit {
                 // Exponent: optional sign, then digits.
                 index += 1
                 if let sign = peek(), sign == UInt8(ascii: "-") || sign == UInt8(ascii: "+") {

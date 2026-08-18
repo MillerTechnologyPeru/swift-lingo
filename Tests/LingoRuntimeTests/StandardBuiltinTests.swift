@@ -231,7 +231,8 @@ struct CoercionSemanticsTests {
 
     @Test func floatKeepsNonNumericStringsUnchanged() {
         #expect(LingoBuiltins.float(.string("demo")).asString() == "demo")
-        if case .string = LingoBuiltins.float(.string("demo")) {} else {
+        if case .string = LingoBuiltins.float(.string("demo")) {
+        } else {
             Issue.record("float of a non-numeric string must stay a string")
         }
         if case .float(let d) = LingoBuiltins.float(.string(" 3.5 ")) {
@@ -245,7 +246,8 @@ struct CoercionSemanticsTests {
         #expect(LingoBuiltins.integer(.float(3.7)).asInteger() == 4)
         #expect(LingoBuiltins.integer(.float(-2.5)).asInteger() == -3)  // half away from zero, like the reference
         #expect(LingoBuiltins.integer(.string("42")).asInteger() == 42)
-        if case .void = LingoBuiltins.integer(.string("demo")) {} else {
+        if case .void = LingoBuiltins.integer(.string("demo")) {
+        } else {
             Issue.record("integer of a non-numeric string must be VOID")
         }
     }

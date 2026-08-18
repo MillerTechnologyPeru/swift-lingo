@@ -205,7 +205,7 @@ struct PropertyListCountTests {
         environment.setGlobal(
             "table",
             .propertyList([
-                (key: .symbol("a"), value: .integer(1)), (key: .symbol("b"), value: .integer(2)),
+                (key: .symbol("a"), value: .integer(1)), (key: .symbol("b"), value: .integer(2))
             ]))
         let assembler = LingoAssembler()
         assembler.get("table").getObjProp("count").ret()

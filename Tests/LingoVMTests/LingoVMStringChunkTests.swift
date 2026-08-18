@@ -58,7 +58,7 @@ import LingoRuntime
             0x03, 0x03,  // firstLine=0, lastLine=0
             0x44, 0x00,  // PushCons "5;21;3;1"
             0x17,  // GetChunk
-            0x01,  // Ret
+            0x01  // Ret
         ],
         literals: [.string("5;21;3;1")], host: host)
     #expect(LingoValue.equalsBool(lhs: try executor.run(), rhs: .string("3")))
@@ -66,7 +66,7 @@ import LingoRuntime
     // Without a movie setting, the delimiter is a comma.
     let plain = try makeExecutor(
         bytes: [
-            0x03, 0x03, 0x03, 0x03, 0x41, 0x02, 0x41, 0x02, 0x03, 0x03, 0x44, 0x00, 0x17, 0x01,
+            0x03, 0x03, 0x03, 0x03, 0x41, 0x02, 0x41, 0x02, 0x03, 0x03, 0x44, 0x00, 0x17, 0x01
         ],
         literals: [.string("a,b;c")])
     #expect(LingoValue.equalsBool(lhs: try plain.run(), rhs: .string("b;c")))
@@ -86,7 +86,7 @@ import LingoRuntime
             0x41, 0x01, 0x41, 0x01,  // firstLine=1, lastLine=1
             0x44, 0x00,  // PushCons "random 2\rintro_1.1"
             0x17,  // GetChunk
-            0x01,  // Ret
+            0x01  // Ret
         ],
         literals: [.string("random 2\rintro_1.1")])
     #expect(LingoValue.equalsBool(lhs: try executor.run(), rhs: .string("2")))
