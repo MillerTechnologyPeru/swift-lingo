@@ -72,6 +72,26 @@ import LingoRuntime
     #expect(LingoValue.equalsBool(lhs: try plain.run(), rhs: .string("b;c")))
 }
 
+/// `word 2 of line 1 of t` narrows level by level: the line first, then
+/// the word within it. Reading only the outermost level handed back the
+/// whole line — and the junkbot music code's `repeat with j = 1 to word 2
+/// of line 1 of the text of member playlist` then compared its counter
+/// against "random 2" forever.
+@Test func nestedChunkSelectorsNarrowLevelByLevel() throws {
+    let executor = try makeExecutor(
+        bytes: [
+            0x03, 0x03,  // firstChar=0, lastChar=0
+            0x41, 0x02, 0x41, 0x02,  // firstWord=2, lastWord=2
+            0x03, 0x03,  // firstItem=0, lastItem=0
+            0x41, 0x01, 0x41, 0x01,  // firstLine=1, lastLine=1
+            0x44, 0x00,  // PushCons "random 2\rintro_1.1"
+            0x17,  // GetChunk
+            0x01,  // Ret
+        ],
+        literals: [.string("random 2\rintro_1.1")])
+    #expect(LingoValue.equalsBool(lhs: try executor.run(), rhs: .string("2")))
+}
+
 @Test func putIntoGlobalWritesBackByName() throws {
     let executor = try makeExecutor(
         bytes: [
