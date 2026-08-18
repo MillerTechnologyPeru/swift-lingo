@@ -158,3 +158,16 @@ private func be32(_ value: UInt32) -> [UInt8] {
     #expect(chunk.literals == [.int(5)])
     #expect(chunk.handlers.isEmpty)
 }
+
+/// The animation-property numbering behind Director 4's `Get`/`Set`
+/// opcodes runs well past `doubleClick` (0x0c) — `the timer` is 0x22, and
+/// the junkbot message boxes time themselves off it.
+@Test func animationPropertyNamesCoverTheWholeTable() {
+    #expect(PropertyNames.animationProperty(0x01) == "beepOn")
+    #expect(PropertyNames.animationProperty(0x0d) == "key")
+    #expect(PropertyNames.animationProperty(0x13) == "timeoutLapsed")
+    #expect(PropertyNames.animationProperty(0x1a) == "soundLevel")
+    #expect(PropertyNames.animationProperty(0x22) == "timer")
+    #expect(PropertyNames.animationProperty(0x28) == "soundMixMedia")
+    #expect(PropertyNames.animationProperty(0x1c) == "animProp_28")
+}
